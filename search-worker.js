@@ -4,7 +4,7 @@ const MAX_MATCHES_PER_TRANSLATION = 250;
 async function loadTranslation(translation) {
   if (cache.has(translation)) return cache.get(translation);
   const response = await fetch(`./data/search/${translation}.json`);
-  if (!response.ok) throw new Error(`${translation} 검색 데이터를 불러오지 못했습니다 (${response.status})`);
+  if (!response.ok) throw new Error(`Could not load ${translation} search data (${response.status})`);
   const data = await response.json();
   cache.set(translation, data);
   return data;
@@ -22,7 +22,7 @@ self.addEventListener("message", async (event) => {
       self.postMessage({
         type: "progress",
         requestId,
-        text: `${translation} 검색 데이터 준비 중 · ${index + 1}/${translations.length}`,
+        text: `Preparing ${translation} search data · ${index + 1}/${translations.length}`,
       });
       datasets.push([translation, await loadTranslation(translation)]);
     }

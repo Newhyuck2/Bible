@@ -1,39 +1,25 @@
 <!doctype html>
-<html lang="ko">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="여러 성경과 번역본을 나란히 읽는 다중 패널 성경 리더" />
-    <title>나란히 성경</title>
+    <meta name="description" content="A compact multi-panel Bible reader" />
+    <title>Bible</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <header class="app-header">
-      <div class="brand-row">
-        <div class="brand">
-          <span class="brand-mark" aria-hidden="true">書</span>
-          <div>
-            <h1>나란히 성경</h1>
-            <p>여러 성경을 펼쳐, 한 절씩 함께 읽습니다.</p>
-          </div>
-        </div>
+      <div class="compact-toolbar">
+        <div class="translation-list" id="translation-list" aria-label="Translation order"></div>
         <div class="header-actions">
           <button class="button button-secondary" id="open-search" type="button">
-            <span aria-hidden="true">⌕</span> 통합 검색
+            <span aria-hidden="true">⌕</span> Search
           </button>
           <button class="button button-primary" id="add-panel" type="button">
-            <span aria-hidden="true">＋</span> 성경 패널 추가
+            <span aria-hidden="true">＋</span> Add panel
           </button>
         </div>
       </div>
-
-      <section class="translation-bar" aria-labelledby="translation-title">
-        <div class="translation-heading">
-          <strong id="translation-title">표시 역본과 순서</strong>
-          <span>체크해서 표시하고, 끌거나 화살표로 순서를 바꾸세요.</span>
-        </div>
-        <div class="translation-list" id="translation-list"></div>
-      </section>
     </header>
 
     <main class="workspace">
@@ -44,10 +30,9 @@
       <div class="search-shell">
         <div class="search-header">
           <div>
-            <span class="eyebrow">네 역본을 한 번에</span>
-            <h2>성경 본문 검색</h2>
+            <h2>Search Bible</h2>
           </div>
-          <button class="icon-button" id="close-search" type="button" aria-label="검색 닫기">×</button>
+          <button class="icon-button" id="close-search" type="button" aria-label="Close search">×</button>
         </div>
 
         <form class="search-form" id="search-form">
@@ -59,14 +44,14 @@
               type="search"
               minlength="2"
               autocomplete="off"
-              placeholder="예: 사랑, 광야, kingdom"
+              placeholder="e.g. 사랑, 광야, kingdom"
               required
             />
           </label>
-          <button class="button button-primary" type="submit">검색</button>
+          <button class="button button-primary" type="submit">Search</button>
         </form>
 
-        <div class="search-meta" id="search-meta">두 글자 이상 입력해 주세요.</div>
+        <div class="search-meta" id="search-meta">Enter at least two characters.</div>
         <div class="search-results" id="search-results"></div>
       </div>
     </dialog>
@@ -74,35 +59,45 @@
     <template id="panel-template">
       <article class="bible-panel">
         <header class="panel-header">
-          <div class="panel-title-row">
-            <span class="panel-kicker">BIBLE PANEL</span>
-            <button class="icon-button remove-panel" type="button" aria-label="이 패널 닫기">×</button>
-          </div>
           <div class="panel-selectors">
-            <label>
-              <span>성경</span>
-              <select class="book-select"></select>
-            </label>
-            <label>
-              <span>장</span>
-              <select class="chapter-select"></select>
-            </label>
+            <div class="combo book-combo">
+              <input
+                class="combo-input book-input"
+                type="text"
+                role="combobox"
+                aria-label="Book"
+                aria-autocomplete="list"
+                aria-expanded="false"
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <button class="combo-toggle" type="button" tabindex="-1" aria-label="Open book list">⌄</button>
+              <div class="combo-menu" role="listbox"></div>
+            </div>
+            <div class="combo chapter-combo">
+              <input
+                class="combo-input chapter-input"
+                type="text"
+                role="combobox"
+                aria-label="Chapter"
+                aria-autocomplete="list"
+                aria-expanded="false"
+                autocomplete="off"
+                inputmode="numeric"
+              />
+              <button class="combo-toggle" type="button" tabindex="-1" aria-label="Open chapter list">⌄</button>
+              <div class="combo-menu" role="listbox"></div>
+            </div>
+            <button class="icon-button remove-panel" type="button" aria-label="Close panel">×</button>
           </div>
         </header>
         <div class="panel-content" tabindex="0"></div>
-        <footer class="panel-footer">
-          <button class="chapter-nav previous-chapter" type="button" aria-label="이전 장">
-            <span aria-hidden="true">←</span><span>이전 장</span>
-          </button>
-          <span class="chapter-position"></span>
-          <button class="chapter-nav next-chapter" type="button" aria-label="다음 장">
-            <span>다음 장</span><span aria-hidden="true">→</span>
-          </button>
-        </footer>
+        <button class="chapter-nav previous-chapter" type="button" aria-label="Previous chapter">←</button>
+        <button class="chapter-nav next-chapter" type="button" aria-label="Next chapter">→</button>
       </article>
     </template>
 
-    <noscript>이 사이트는 성경 데이터를 표시하기 위해 JavaScript가 필요합니다.</noscript>
+    <noscript>JavaScript is required to display the Bible text.</noscript>
     <script type="module" src="./app.js"></script>
   </body>
 </html>

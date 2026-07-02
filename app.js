@@ -91,7 +91,7 @@ function renderTranslationControls() {
     const handle = document.createElement("span");
     handle.className = "drag-handle";
     handle.textContent = "⠿";
-    handle.title = "끌어서 순서 변경";
+    handle.title = "Drag to reorder";
     handle.setAttribute("aria-hidden", "true");
 
     const label = document.createElement("label");
@@ -122,14 +122,14 @@ function renderTranslationControls() {
     left.type = "button";
     left.textContent = "‹";
     left.disabled = index === 0;
-    left.setAttribute("aria-label", `${meta.label}을 앞으로 이동`);
+    left.setAttribute("aria-label", `Move ${meta.label} left`);
     left.addEventListener("click", () => moveTranslation(index, index - 1));
     const right = document.createElement("button");
     right.className = "move-translation";
     right.type = "button";
     right.textContent = "›";
     right.disabled = index === state.translationOrder.length - 1;
-    right.setAttribute("aria-label", `${meta.label}을 뒤로 이동`);
+    right.setAttribute("aria-label", `Move ${meta.label} right`);
     right.addEventListener("click", () => moveTranslation(index, index + 1));
     moveButtons.append(left, right);
 
@@ -162,49 +162,205 @@ function moveTranslation(from, to) {
   refreshPanelBodies();
 }
 
+const HANGUL_INITIALS = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ";
+
+function hangulInitials(value) {
+  return [...value]
+    .map((character) => {
+      const code = character.charCodeAt(0);
+      if (code < 0xac00 || code > 0xd7a3) return character;
+      return HANGUL_INITIALS[Math.floor((code - 0xac00) / 588)];
+    })
+    .join("");
+}
+
+function matchesBook(item, query) {
+  const needle = query.trim().toLocaleLowerCase();
+  if (!needle) return true;
+  if (`${item.ko} ${item.en}`.toLocaleLowerCase().includes(needle)) return true;
+  const compact = needle.replace(/\s+/g, "");
+  return [...compact].every((character) => HANGUL_INITIALS.includes(character))
+    && hangulInitials(item.ko).includes(compact);
+}
+
+function setupCombobox({ input, toggle, menu, items, selectedValue, matches, onSelect }) {
+  let allItems = items;
+  let selected = selectedValue;
+  let filtered = [];
+  let highlighted = 0;
+
+  function selectedItem() {
+    return allItems.find((item) => item.value === selected);
+  }
+
+  function close() {
+    menu.hidden = true;
+    input.setAttribute("aria-expanded", "false");
+  }
+
+  function choose(item, notify = true) {
+    if (!item) return;
+    selected = item.value;
+    input.value = item.label;
+    close();
+    if (notify) onSelect(item.value);
+  }
+
+  function render(query = "") {
+    filtered = allItems.filter((item) => matches(item, query));
+    highlighted = 0;
+    menu.replaceChildren();
+    for (const [index, item] of filtered.entries()) {
+      const option = document.createElement("button");
+      option.type = "button";
+      option.className = "combo-option";
+      option.setAttribute("role", "option");
+      option.setAttribute("aria-selected", String(item.value === selected));
+      option.textContent = item.label;
+      option.addEventListener("pointerdown", (event) => {
+        event.preventDefault();
+        choose(item);
+      });
+      if (index === highlighted) option.classList.add("highlighted");
+      menu.append(option);
+    }
+    if (!filtered.length) {
+      const empty = document.createElement("div");
+      empty.className = "combo-empty";
+      empty.textContent = "No matches";
+      menu.append(empty);
+    }
+  }
+
+  function updateHighlight(nextIndex) {
+    if (!filtered.length) return;
+    highlighted = (nextIndex + filtered.length) % filtered.length;
+    menu.querySelectorAll(".combo-option").forEach((option, index) => {
+      option.classList.toggle("highlighted", index === highlighted);
+    });
+    menu.querySelectorAll(".combo-option")[highlighted]?.scrollIntoView({ block: "nearest" });
+  }
+
+  function open(selectText = false) {
+    render(selectText ? "" : input.value === selectedItem()?.label ? "" : input.value);
+    menu.hidden = false;
+    input.setAttribute("aria-expanded", "true");
+    if (selectText) input.select();
+  }
+
+  input.addEventListener("focus", () => open(true));
+  input.addEventListener("input", () => {
+    render(input.value);
+    menu.hidden = false;
+    input.setAttribute("aria-expanded", "true");
+  });
+  input.addEventListener("keydown", (event) => {
+    if (event.isComposing) return;
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      if (menu.hidden) open();
+      updateHighlight(highlighted + (event.key === "ArrowDown" ? 1 : -1));
+    } else if (event.key === "Enter") {
+      if (!menu.hidden && filtered.length) {
+        event.preventDefault();
+        choose(filtered[highlighted]);
+      }
+    } else if (event.key === "Escape") {
+      close();
+      input.value = selectedItem()?.label ?? "";
+      input.select();
+    }
+  });
+  input.addEventListener("blur", () => {
+    window.setTimeout(() => {
+      close();
+      input.value = selectedItem()?.label ?? "";
+    }, 100);
+  });
+  toggle.addEventListener("click", () => {
+    input.focus();
+    open(true);
+  });
+
+  choose(selectedItem(), false);
+  close();
+
+  return {
+    setItems(nextItems) {
+      allItems = nextItems;
+      render();
+    },
+    setValue(value) {
+      selected = value;
+      choose(selectedItem(), false);
+    },
+  };
+}
+
+function chapterItems(bookIndex) {
+  return Array.from({ length: manifest.books[bookIndex].chapters }, (_, index) => ({
+    value: index + 1,
+    label: String(index + 1),
+  }));
+}
+
 function createPanelElement(panelState, shouldScroll = false) {
   const id = `panel-${++panelIdCounter}`;
   panelState.id = id;
   const fragment = panelTemplate.content.cloneNode(true);
   const panel = fragment.querySelector(".bible-panel");
-  const bookSelect = fragment.querySelector(".book-select");
-  const chapterSelect = fragment.querySelector(".chapter-select");
+  const bookInput = fragment.querySelector(".book-input");
+  const chapterInput = fragment.querySelector(".chapter-input");
   const content = fragment.querySelector(".panel-content");
   const remove = fragment.querySelector(".remove-panel");
   const previous = fragment.querySelector(".previous-chapter");
   const next = fragment.querySelector(".next-chapter");
-  const position = fragment.querySelector(".chapter-position");
 
   panel.dataset.panelId = id;
   panel.addEventListener("pointerdown", () => setActivePanel(id));
   panel.addEventListener("focusin", () => setActivePanel(id));
 
-  manifest.books.forEach((book, index) => {
-    const option = document.createElement("option");
-    option.value = String(index);
-    option.textContent = `${book.ko} · ${book.en}`;
-    bookSelect.append(option);
+  const bookItems = manifest.books.map((book, index) => ({
+    value: index,
+    label: `${book.ko} · ${book.en}`,
+    ko: book.ko,
+    en: book.en,
+  }));
+  let chapterCombo;
+  const bookCombo = setupCombobox({
+    input: bookInput,
+    toggle: fragment.querySelector(".book-combo .combo-toggle"),
+    menu: fragment.querySelector(".book-combo .combo-menu"),
+    items: bookItems,
+    selectedValue: panelState.book,
+    matches: matchesBook,
+    onSelect: (book) => {
+      panelState.book = book;
+      panelState.chapter = 1;
+      chapterCombo.setItems(chapterItems(book));
+      chapterCombo.setValue(1);
+      saveState();
+      loadPanel(panelState);
+    },
   });
-  bookSelect.value = String(panelState.book);
-  fillChapterSelect(chapterSelect, panelState.book, panelState.chapter);
-
-  bookSelect.addEventListener("change", () => {
-    panelState.book = Number(bookSelect.value);
-    panelState.chapter = 1;
-    fillChapterSelect(chapterSelect, panelState.book, 1);
-    saveState();
-    loadPanel(panelState);
-  });
-  chapterSelect.addEventListener("change", () => {
-    panelState.chapter = Number(chapterSelect.value);
-    saveState();
-    loadPanel(panelState);
+  chapterCombo = setupCombobox({
+    input: chapterInput,
+    toggle: fragment.querySelector(".chapter-combo .combo-toggle"),
+    menu: fragment.querySelector(".chapter-combo .combo-menu"),
+    items: chapterItems(panelState.book),
+    selectedValue: panelState.chapter,
+    matches: (item, query) => !query.trim() || item.label.startsWith(query.trim()),
+    onSelect: (chapter) => {
+      panelState.chapter = chapter;
+      saveState();
+      loadPanel(panelState);
+    },
   });
   remove.addEventListener("click", () => removePanel(id));
   previous.addEventListener("click", () => navigateChapter(panelState, -1));
   next.addEventListener("click", () => navigateChapter(panelState, 1));
 
-  panelElements.set(id, { panel, bookSelect, chapterSelect, content, remove, previous, next, position });
+  panelElements.set(id, { panel, bookCombo, chapterCombo, content, remove, previous, next });
   panelTrack.append(fragment);
   updateRemoveButtons();
   setActivePanel(id);
@@ -213,18 +369,6 @@ function createPanelElement(panelState, shouldScroll = false) {
   if (shouldScroll) {
     requestAnimationFrame(() => panel.scrollIntoView({ behavior: "smooth", inline: "end", block: "nearest" }));
   }
-}
-
-function fillChapterSelect(select, bookIndex, selectedChapter) {
-  select.replaceChildren();
-  const count = manifest.books[bookIndex].chapters;
-  for (let chapter = 1; chapter <= count; chapter += 1) {
-    const option = document.createElement("option");
-    option.value = String(chapter);
-    option.textContent = `${chapter}장`;
-    select.append(option);
-  }
-  select.value = String(selectedChapter);
 }
 
 function setActivePanel(id) {
@@ -269,7 +413,7 @@ async function getChapter(bookIndex, chapter) {
   const key = `${bookIndex}:${chapter}`;
   if (chapterCache.has(key)) return chapterCache.get(key);
   const response = await fetch(chapterPath(bookIndex, chapter));
-  if (!response.ok) throw new Error(`본문을 불러오지 못했습니다 (${response.status})`);
+  if (!response.ok) throw new Error(`Could not load this chapter (${response.status})`);
   const data = await response.json();
   chapterCache.set(key, data);
   if (chapterCache.size > 40) chapterCache.delete(chapterCache.keys().next().value);
@@ -281,7 +425,7 @@ async function loadPanel(panelState, targetVerse = null) {
   if (!elements) return;
   const requestKey = `${panelState.book}:${panelState.chapter}:${Date.now()}`;
   elements.panel.dataset.requestKey = requestKey;
-  elements.content.innerHTML = '<div class="panel-message">본문을 펼치는 중입니다…</div>';
+  elements.content.innerHTML = '<div class="panel-message">Loading…</div>';
   updatePanelControls(panelState);
 
   try {
@@ -298,7 +442,7 @@ async function loadPanel(panelState, targetVerse = null) {
       elements.content.scrollTop = 0;
     }
   } catch (error) {
-    elements.content.innerHTML = `<div class="panel-message error">${escapeHtml(error.message)}<br />로컬에서는 HTTP 서버로 열어 주세요.</div>`;
+    elements.content.innerHTML = `<div class="panel-message error">${escapeHtml(error.message)}<br />Use a local HTTP server when previewing.</div>`;
   }
 }
 
@@ -307,15 +451,6 @@ function renderPanelBody(panelState) {
   if (!elements || !panelState.data) return;
   const enabled = state.translationOrder.filter((id) => state.enabledTranslations.includes(id));
   const fragment = document.createDocumentFragment();
-
-  const heading = document.createElement("div");
-  heading.className = "chapter-heading";
-  const title = document.createElement("h2");
-  title.textContent = `${manifest.books[panelState.book].ko} ${panelState.chapter}장`;
-  const subtitle = document.createElement("p");
-  subtitle.textContent = `${manifest.books[panelState.book].en} · ${panelState.data.v.length}개 절`;
-  heading.append(title, subtitle);
-  fragment.append(heading);
 
   for (const [verseNumber, texts] of panelState.data.v) {
     const group = document.createElement("section");
@@ -332,6 +467,7 @@ function renderPanelBody(panelState) {
       rendered += 1;
       const line = document.createElement("div");
       line.className = "translation-line";
+      line.lang = translation === "GAE" || translation === "SAENEW" ? "ko" : "en";
       line.style.setProperty("--translation-color", TRANSLATION_COLORS[translation]);
       const label = document.createElement("span");
       label.className = "translation-label";
@@ -346,7 +482,7 @@ function renderPanelBody(panelState) {
     if (!rendered) {
       const empty = document.createElement("p");
       empty.className = "empty-translation";
-      empty.textContent = "표시할 역본을 위에서 선택해 주세요.";
+      empty.textContent = "Select at least one translation.";
       group.append(empty);
     }
     fragment.append(group);
@@ -363,11 +499,9 @@ function refreshPanelBodies() {
 function updatePanelControls(panelState) {
   const elements = panelElements.get(panelState.id);
   if (!elements) return;
-  elements.bookSelect.value = String(panelState.book);
-  if (elements.chapterSelect.value !== String(panelState.chapter)) {
-    fillChapterSelect(elements.chapterSelect, panelState.book, panelState.chapter);
-  }
-  elements.position.textContent = `${manifest.books[panelState.book].ko} ${panelState.chapter}장`;
+  elements.bookCombo.setValue(panelState.book);
+  elements.chapterCombo.setItems(chapterItems(panelState.book));
+  elements.chapterCombo.setValue(panelState.chapter);
   elements.previous.disabled = panelState.book === 0 && panelState.chapter === 1;
   const finalBook = manifest.books.length - 1;
   elements.next.disabled =
@@ -387,8 +521,6 @@ function navigateChapter(panelState, direction) {
   if (book === panelState.book && chapter === panelState.chapter) return;
   panelState.book = book;
   panelState.chapter = chapter;
-  const elements = panelElements.get(panelState.id);
-  fillChapterSelect(elements.chapterSelect, book, chapter);
   saveState();
   loadPanel(panelState);
 }
@@ -406,11 +538,11 @@ function runSearch(query) {
   const translations = state.translationOrder.filter((id) => state.enabledTranslations.includes(id));
   searchResults.replaceChildren();
   if (!translations.length) {
-    searchMeta.textContent = "검색할 역본을 하나 이상 선택해 주세요.";
+    searchMeta.textContent = "Select at least one translation.";
     return;
   }
   searchRequestId += 1;
-  searchMeta.textContent = `“${query}” 검색 데이터를 준비하는 중입니다…`;
+  searchMeta.textContent = `Preparing search data for “${query}”…`;
   searchWorker.postMessage({ type: "search", requestId: searchRequestId, query, translations });
 }
 
@@ -422,7 +554,7 @@ searchWorker.addEventListener("message", (event) => {
   } else if (message.type === "result") {
     renderSearchResults(message.query, message.matches, message.truncated, message.elapsedMs);
   } else if (message.type === "error") {
-    searchMeta.textContent = `검색 중 오류가 발생했습니다: ${message.error}`;
+    searchMeta.textContent = `Search failed: ${message.error}`;
   }
 });
 
@@ -438,12 +570,12 @@ function renderSearchResults(query, matches, truncated, elapsedMs) {
     (a, b) => a.book - b.book || a.chapter - b.chapter || a.verse - b.verse,
   );
 
-  searchMeta.textContent = `${groups.length.toLocaleString()}개 구절 · ${matches.length.toLocaleString()}개 역본에서 찾음 · ${(elapsedMs / 1000).toFixed(1)}초${truncated ? " · 상위 결과만 표시" : ""}`;
+  searchMeta.textContent = `${groups.length.toLocaleString()} verses · ${matches.length.toLocaleString()} translation matches · ${(elapsedMs / 1000).toFixed(1)}s${truncated ? " · Top results shown" : ""}`;
 
   if (!groups.length) {
     const empty = document.createElement("div");
     empty.className = "panel-message";
-    empty.textContent = "검색 결과가 없습니다. 다른 단어나 짧은 형태로 검색해 보세요.";
+    empty.textContent = "No results. Try another word or a shorter form.";
     searchResults.append(empty);
     return;
   }
@@ -454,7 +586,7 @@ function renderSearchResults(query, matches, truncated, elapsedMs) {
     button.type = "button";
     const reference = document.createElement("div");
     reference.className = "search-reference";
-    reference.innerHTML = `<span>${escapeHtml(manifest.books[result.book].ko)} ${result.chapter}:${result.verse}</span><span aria-hidden="true">→</span>`;
+    reference.innerHTML = `<span>${escapeHtml(manifest.books[result.book].en)} ${result.chapter}:${result.verse}</span><span aria-hidden="true">→</span>`;
     button.append(reference);
 
     result.lines.sort(
@@ -499,10 +631,9 @@ function openSearchResult(result) {
   const panelState = state.panels.find((panel) => panel.id === activePanelId) ?? state.panels[0];
   panelState.book = result.book;
   panelState.chapter = result.chapter;
-  const elements = panelElements.get(panelState.id);
-  fillChapterSelect(elements.chapterSelect, result.book, result.chapter);
   saveState();
   closeSearch();
+  const elements = panelElements.get(panelState.id);
   elements.panel.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
   loadPanel(panelState, result.verse);
 }
@@ -519,7 +650,7 @@ function escapeHtml(value) {
 async function init() {
   try {
     const response = await fetch("./data/manifest.json");
-    if (!response.ok) throw new Error(`설정 데이터를 불러오지 못했습니다 (${response.status})`);
+    if (!response.ok) throw new Error(`Could not load site data (${response.status})`);
     manifest = await response.json();
     state = loadState();
     sanitizeState();
@@ -527,7 +658,7 @@ async function init() {
     for (const panel of state.panels) createPanelElement(panel);
     saveState();
   } catch (error) {
-    panelTrack.innerHTML = `<div class="panel-message error">사이트를 시작하지 못했습니다: ${escapeHtml(error.message)}<br />로컬에서는 HTTP 서버로 열어 주세요.</div>`;
+    panelTrack.innerHTML = `<div class="panel-message error">Could not start the site: ${escapeHtml(error.message)}<br />Use a local HTTP server when previewing.</div>`;
   }
 }
 
