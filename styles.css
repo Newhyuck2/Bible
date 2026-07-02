@@ -1853,3 +1853,40 @@ body * {
     font-size: 9px;
   }
 }
+
+/* Panel header controls stay inside the panel at every resizable width. */
+.panel-selectors {
+  grid-template-columns: 30px minmax(90px, 1fr) 28px minmax(70px, 92px) 28px;
+  gap: 4px;
+}
+
+.panel-selectors .remove-panel {
+  width: 30px;
+  height: 36px;
+}
+
+.panel-selectors .chapter-nav {
+  position: static;
+  display: grid;
+  width: 28px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+  place-items: center;
+  justify-self: stretch;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  color: var(--accent);
+  box-shadow: none;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+  backdrop-filter: none;
+}
+
+.panel-selectors .previous-chapter,
+.panel-selectors .next-chapter {
+  right: auto;
+  left: auto;
+}

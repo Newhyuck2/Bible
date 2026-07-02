@@ -106,6 +106,7 @@
       <article class="bible-panel">
         <header class="panel-header">
           <div class="panel-selectors">
+            <button class="icon-button remove-panel" type="button" aria-label="Delete panel">×</button>
             <div class="selector-control book-selector">
               <span class="selector-label">Book</span>
               <div class="combo book-combo">
@@ -123,6 +124,7 @@
                 <div class="combo-menu" role="listbox"></div>
               </div>
             </div>
+            <button class="chapter-nav previous-chapter" type="button" aria-label="Previous chapter">&lt;</button>
             <div class="selector-control chapter-selector">
               <span class="selector-label">Chapter</span>
               <div class="combo chapter-combo">
@@ -140,18 +142,16 @@
                 <div class="combo-menu" role="listbox"></div>
               </div>
             </div>
-            <button class="icon-button remove-panel" type="button" aria-label="Delete panel">×</button>
+            <button class="chapter-nav next-chapter" type="button" aria-label="Next chapter">&gt;</button>
           </div>
         </header>
         <div class="panel-content" tabindex="0"></div>
-        <button class="chapter-nav previous-chapter" type="button" aria-label="Previous chapter">←</button>
         <button class="copy-selection" type="button" aria-label="Copy selected verses" hidden>
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <rect x="8" y="8" width="11" height="11" rx="2"></rect>
             <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path>
           </svg>
         </button>
-        <button class="chapter-nav next-chapter" type="button" aria-label="Next chapter">→</button>
         <div class="panel-resize-handle" role="separator" aria-orientation="vertical" aria-label="Resize panel"></div>
       </article>
     </template>
