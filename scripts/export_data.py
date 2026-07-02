@@ -15,8 +15,8 @@ OUTPUT = ROOT / "data"
 TRANSLATIONS = [
     {"id": "ESV", "label": "ESV", "name": "English Standard Version"},
     {"id": "NIV", "label": "NIV", "name": "New International Version"},
-    {"id": "GAE", "label": "GAE", "name": "Korean Revised Version"},
-    {"id": "SAENEW", "label": "SAENEW", "name": "Korean New Translation"},
+    {"id": "GAE", "label": "개역개정", "name": "Korean Revised Version"},
+    {"id": "SAENEW", "label": "새번역", "name": "Korean New Translation"},
 ]
 
 KOREAN_BOOK_NAMES = [

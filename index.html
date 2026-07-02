@@ -11,6 +11,12 @@
     <header class="app-header">
       <div class="compact-toolbar">
         <div class="translation-list" id="translation-list" aria-label="Translation order"></div>
+        <label class="font-size-control" aria-label="Bible text size">
+          <span aria-hidden="true">A−</span>
+          <input id="font-size" type="range" min="12" max="22" step="1" value="14" />
+          <span aria-hidden="true">A＋</span>
+          <output id="font-size-value" for="font-size">14</output>
+        </label>
         <div class="header-actions">
           <button class="button button-secondary" id="open-search" type="button">
             <span aria-hidden="true">⌕</span> Search
@@ -44,7 +50,6 @@
               type="search"
               minlength="2"
               autocomplete="off"
-              placeholder="e.g. 사랑, 광야, kingdom"
               required
             />
           </label>
@@ -53,6 +58,41 @@
 
         <div class="search-meta" id="search-meta">Enter at least two characters.</div>
         <div class="search-results" id="search-results"></div>
+      </div>
+    </dialog>
+
+    <dialog class="copy-dialog" id="copy-dialog">
+      <div class="copy-shell">
+        <div class="copy-header">
+          <div>
+            <h2>Copy verses</h2>
+            <p id="copy-reference"></p>
+          </div>
+          <button class="icon-button" id="close-copy" type="button" aria-label="Close copy options">×</button>
+        </div>
+
+        <fieldset>
+          <legend>Translations</legend>
+          <div class="copy-translation-options" id="copy-translations"></div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Order</legend>
+          <label class="copy-order-option">
+            <input type="radio" name="copy-order" value="verse" checked />
+            <span><strong>Verse by verse</strong><small>Verse 2: ESV, NIV, 개역개정, 새번역…</small></span>
+          </label>
+          <label class="copy-order-option">
+            <input type="radio" name="copy-order" value="translation" />
+            <span><strong>Translation by translation</strong><small>ESV 2–10, NIV 2–10…</small></span>
+          </label>
+        </fieldset>
+
+        <div class="copy-actions">
+          <span class="copy-status" id="copy-status" aria-live="polite"></span>
+          <button class="button button-secondary" id="cancel-copy" type="button">Cancel</button>
+          <button class="button button-primary" id="confirm-copy" type="button">Copy</button>
+        </div>
       </div>
     </dialog>
 
@@ -88,12 +128,19 @@
               <button class="combo-toggle" type="button" tabindex="-1" aria-label="Open chapter list">⌄</button>
               <div class="combo-menu" role="listbox"></div>
             </div>
+            <button class="icon-button copy-verses" type="button" aria-label="Copy selected verses" disabled>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="8" y="8" width="11" height="11" rx="2"></rect>
+                <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path>
+              </svg>
+            </button>
             <button class="icon-button remove-panel" type="button" aria-label="Close panel">×</button>
           </div>
         </header>
         <div class="panel-content" tabindex="0"></div>
         <button class="chapter-nav previous-chapter" type="button" aria-label="Previous chapter">←</button>
         <button class="chapter-nav next-chapter" type="button" aria-label="Next chapter">→</button>
+        <div class="panel-resize-handle" role="separator" aria-orientation="vertical" aria-label="Resize panel"></div>
       </article>
     </template>
 

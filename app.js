@@ -17,12 +17,22 @@ const searchForm = document.querySelector("#search-form");
 const searchInput = document.querySelector("#search-input");
 const searchMeta = document.querySelector("#search-meta");
 const searchResults = document.querySelector("#search-results");
+const fontSizeInput = document.querySelector("#font-size");
+const fontSizeValue = document.querySelector("#font-size-value");
+const copyDialog = document.querySelector("#copy-dialog");
+const closeCopyButton = document.querySelector("#close-copy");
+const cancelCopyButton = document.querySelector("#cancel-copy");
+const confirmCopyButton = document.querySelector("#confirm-copy");
+const copyReference = document.querySelector("#copy-reference");
+const copyTranslations = document.querySelector("#copy-translations");
+const copyStatus = document.querySelector("#copy-status");
 
 let manifest;
 let state;
 let activePanelId;
 let panelIdCounter = 0;
 let searchRequestId = 0;
+let copyPanelState = null;
 const chapterCache = new Map();
 const panelElements = new Map();
 const searchWorker = new Worker("./search-worker.js");
@@ -31,6 +41,7 @@ function freshState() {
   return {
     translationOrder: ["ESV", "NIV", "GAE", "SAENEW"],
     enabledTranslations: ["ESV", "NIV", "GAE", "SAENEW"],
+    fontSize: 14,
     panels: [{ book: 0, chapter: 1 }],
   };
 }
@@ -53,11 +64,13 @@ function sanitizeState() {
   }
   state.translationOrder = order;
   state.enabledTranslations = state.enabledTranslations.filter((id) => validTranslations.has(id));
+  state.fontSize = Math.max(12, Math.min(Number(state.fontSize) || 14, 22));
   state.panels = state.panels
     .map((panel) => {
       const book = Math.max(0, Math.min(Number(panel.book) || 0, manifest.books.length - 1));
       const chapter = Math.max(1, Math.min(Number(panel.chapter) || 1, manifest.books[book].chapters));
-      return { book, chapter };
+      const width = Number(panel.width);
+      return { book, chapter, width: Number.isFinite(width) ? Math.max(320, Math.min(width, 1000)) : null };
     })
     .slice(0, 12);
   if (!state.panels.length) state.panels = [{ book: 0, chapter: 1 }];
@@ -69,7 +82,8 @@ function saveState() {
     JSON.stringify({
       translationOrder: state.translationOrder,
       enabledTranslations: state.enabledTranslations,
-      panels: state.panels.map(({ book, chapter }) => ({ book, chapter })),
+      fontSize: state.fontSize,
+      panels: state.panels.map(({ book, chapter, width }) => ({ book, chapter, width })),
     }),
   );
 }
@@ -304,6 +318,41 @@ function chapterItems(bookIndex) {
   }));
 }
 
+function setupPanelResize(panel, handle, panelState) {
+  handle.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const startX = event.clientX;
+    const startWidth = panel.getBoundingClientRect().width;
+    document.body.classList.add("resizing-panel");
+    handle.setPointerCapture(event.pointerId);
+
+    const resize = (moveEvent) => {
+      const width = Math.max(320, Math.min(startWidth + moveEvent.clientX - startX, 1000));
+      panelState.width = Math.round(width);
+      panel.style.flexBasis = `${panelState.width}px`;
+    };
+    const finish = () => {
+      document.body.classList.remove("resizing-panel");
+      handle.removeEventListener("pointermove", resize);
+      handle.removeEventListener("pointerup", finish);
+      handle.removeEventListener("pointercancel", finish);
+      saveState();
+    };
+
+    handle.addEventListener("pointermove", resize);
+    handle.addEventListener("pointerup", finish);
+    handle.addEventListener("pointercancel", finish);
+  });
+
+  handle.addEventListener("dblclick", () => {
+    panelState.width = null;
+    panel.style.removeProperty("flex-basis");
+    saveState();
+  });
+}
+
 function createPanelElement(panelState, shouldScroll = false) {
   const id = `panel-${++panelIdCounter}`;
   panelState.id = id;
@@ -312,11 +361,16 @@ function createPanelElement(panelState, shouldScroll = false) {
   const bookInput = fragment.querySelector(".book-input");
   const chapterInput = fragment.querySelector(".chapter-input");
   const content = fragment.querySelector(".panel-content");
+  const copy = fragment.querySelector(".copy-verses");
   const remove = fragment.querySelector(".remove-panel");
   const previous = fragment.querySelector(".previous-chapter");
   const next = fragment.querySelector(".next-chapter");
+  const resizeHandle = fragment.querySelector(".panel-resize-handle");
 
   panel.dataset.panelId = id;
+  panelState.selectionAnchor = null;
+  panelState.selectionEnd = null;
+  if (panelState.width) panel.style.flexBasis = `${panelState.width}px`;
   panel.addEventListener("pointerdown", () => setActivePanel(id));
   panel.addEventListener("focusin", () => setActivePanel(id));
 
@@ -356,11 +410,13 @@ function createPanelElement(panelState, shouldScroll = false) {
       loadPanel(panelState);
     },
   });
+  copy.addEventListener("click", () => openCopyDialog(panelState));
   remove.addEventListener("click", () => removePanel(id));
   previous.addEventListener("click", () => navigateChapter(panelState, -1));
   next.addEventListener("click", () => navigateChapter(panelState, 1));
+  setupPanelResize(panel, resizeHandle, panelState);
 
-  panelElements.set(id, { panel, bookCombo, chapterCombo, content, remove, previous, next });
+  panelElements.set(id, { panel, bookCombo, chapterCombo, content, copy, remove, previous, next });
   panelTrack.append(fragment);
   updateRemoveButtons();
   setActivePanel(id);
@@ -380,7 +436,7 @@ function setActivePanel(id) {
 
 function addPanel() {
   const source = state.panels.find((panel) => panel.id === activePanelId) ?? state.panels.at(-1);
-  const panelState = { book: source?.book ?? 0, chapter: source?.chapter ?? 1 };
+  const panelState = { book: source?.book ?? 0, chapter: source?.chapter ?? 1, width: source?.width ?? null };
   state.panels.push(panelState);
   saveState();
   createPanelElement(panelState, true);
@@ -420,11 +476,56 @@ async function getChapter(bookIndex, chapter) {
   return data;
 }
 
+function selectionBounds(panelState) {
+  if (panelState.selectionAnchor == null || panelState.selectionEnd == null) return null;
+  return [
+    Math.min(panelState.selectionAnchor, panelState.selectionEnd),
+    Math.max(panelState.selectionAnchor, panelState.selectionEnd),
+  ];
+}
+
+function updatePanelSelection(panelState) {
+  const elements = panelElements.get(panelState.id);
+  if (!elements) return;
+  const bounds = selectionBounds(panelState);
+  elements.content.querySelectorAll(".verse-group").forEach((group) => {
+    const verse = Number(group.dataset.verse);
+    group.classList.toggle("selected", Boolean(bounds && verse >= bounds[0] && verse <= bounds[1]));
+  });
+  elements.copy.disabled = !bounds;
+}
+
+function clearPanelSelection(panelState) {
+  panelState.selectionAnchor = null;
+  panelState.selectionEnd = null;
+  updatePanelSelection(panelState);
+}
+
+function selectVerse(panelState, verse) {
+  const bounds = selectionBounds(panelState);
+  if (!bounds) {
+    panelState.selectionAnchor = verse;
+    panelState.selectionEnd = verse;
+  } else if (panelState.selectionAnchor === panelState.selectionEnd) {
+    if (panelState.selectionAnchor === verse) {
+      panelState.selectionAnchor = null;
+      panelState.selectionEnd = null;
+    } else {
+      panelState.selectionEnd = verse;
+    }
+  } else {
+    panelState.selectionAnchor = verse;
+    panelState.selectionEnd = verse;
+  }
+  updatePanelSelection(panelState);
+}
+
 async function loadPanel(panelState, targetVerse = null) {
   const elements = panelElements.get(panelState.id);
   if (!elements) return;
   const requestKey = `${panelState.book}:${panelState.chapter}:${Date.now()}`;
   elements.panel.dataset.requestKey = requestKey;
+  clearPanelSelection(panelState);
   elements.content.innerHTML = '<div class="panel-message">Loading…</div>';
   updatePanelControls(panelState);
 
@@ -456,6 +557,7 @@ function renderPanelBody(panelState) {
     const group = document.createElement("section");
     group.className = "verse-group";
     group.dataset.verse = String(verseNumber);
+    group.addEventListener("click", () => selectVerse(panelState, verseNumber));
     const number = document.createElement("span");
     number.className = "verse-number";
     number.textContent = String(verseNumber);
@@ -489,6 +591,7 @@ function renderPanelBody(panelState) {
   }
 
   elements.content.replaceChildren(fragment);
+  updatePanelSelection(panelState);
   updatePanelControls(panelState);
 }
 
@@ -523,6 +626,109 @@ function navigateChapter(panelState, direction) {
   panelState.chapter = chapter;
   saveState();
   loadPanel(panelState);
+}
+
+function applyFontSize() {
+  document.documentElement.style.setProperty("--verse-font-size", `${state.fontSize}px`);
+  fontSizeInput.value = String(state.fontSize);
+  fontSizeValue.value = String(state.fontSize);
+  fontSizeValue.textContent = String(state.fontSize);
+}
+
+function openCopyDialog(panelState) {
+  const bounds = selectionBounds(panelState);
+  if (!bounds || !panelState.data) return;
+  copyPanelState = panelState;
+  copyStatus.textContent = "";
+  confirmCopyButton.textContent = "Copy";
+  const book = manifest.books[panelState.book];
+  copyReference.textContent = `${book.ko} ${panelState.chapter}:${bounds[0]}–${bounds[1]}`;
+  copyTranslations.replaceChildren();
+
+  const defaultTranslations = state.enabledTranslations.length
+    ? new Set(state.enabledTranslations)
+    : new Set(state.translationOrder);
+  for (const translation of state.translationOrder) {
+    const label = document.createElement("label");
+    label.className = "copy-translation-option";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.value = translation;
+    checkbox.checked = defaultTranslations.has(translation);
+    const text = document.createElement("span");
+    text.textContent = translationMeta(translation).label;
+    label.append(checkbox, text);
+    copyTranslations.append(label);
+  }
+  copyDialog.showModal();
+}
+
+function closeCopyDialog() {
+  copyDialog.close();
+  copyPanelState = null;
+}
+
+function buildCopyText(panelState, translations, order) {
+  const [start, end] = selectionBounds(panelState);
+  const book = manifest.books[panelState.book];
+  const verses = panelState.data.v.filter(([verse]) => verse >= start && verse <= end);
+  const lines = [];
+
+  if (order === "translation") {
+    for (const translation of translations) {
+      lines.push(`${translationMeta(translation).label} — ${book.ko} ${panelState.chapter}:${start}–${end}`);
+      for (const [verse, texts] of verses) {
+        if (texts[translation]) lines.push(`${verse} ${texts[translation]}`);
+      }
+      lines.push("");
+    }
+  } else {
+    for (const [verse, texts] of verses) {
+      lines.push(`${book.ko} ${panelState.chapter}:${verse}`);
+      for (const translation of translations) {
+        if (texts[translation]) lines.push(`${translationMeta(translation).label} ${texts[translation]}`);
+      }
+      lines.push("");
+    }
+  }
+  return lines.join("\n").trim();
+}
+
+async function writeClipboard(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.append(textarea);
+  textarea.select();
+  const copied = document.execCommand("copy");
+  textarea.remove();
+  if (!copied) throw new Error("Clipboard access was denied.");
+}
+
+async function copySelectedVerses() {
+  if (!copyPanelState) return;
+  const translations = [...copyTranslations.querySelectorAll('input[type="checkbox"]:checked')]
+    .map((checkbox) => checkbox.value);
+  if (!translations.length) {
+    copyStatus.textContent = "Select a translation.";
+    return;
+  }
+  const order = copyDialog.querySelector('input[name="copy-order"]:checked').value;
+  const text = buildCopyText(copyPanelState, translations, order);
+  try {
+    await writeClipboard(text);
+    copyStatus.textContent = "Copied";
+    confirmCopyButton.textContent = "Copied";
+    window.setTimeout(closeCopyDialog, 450);
+  } catch (error) {
+    copyStatus.textContent = error.message;
+  }
 }
 
 function openSearch() {
@@ -654,6 +860,7 @@ async function init() {
     manifest = await response.json();
     state = loadState();
     sanitizeState();
+    applyFontSize();
     renderTranslationControls();
     for (const panel of state.panels) createPanelElement(panel);
     saveState();
@@ -663,10 +870,21 @@ async function init() {
 }
 
 addPanelButton.addEventListener("click", addPanel);
+fontSizeInput.addEventListener("input", () => {
+  state.fontSize = Number(fontSizeInput.value);
+  applyFontSize();
+});
+fontSizeInput.addEventListener("change", saveState);
 openSearchButton.addEventListener("click", openSearch);
 closeSearchButton.addEventListener("click", closeSearch);
 searchDialog.addEventListener("click", (event) => {
   if (event.target === searchDialog) closeSearch();
+});
+closeCopyButton.addEventListener("click", closeCopyDialog);
+cancelCopyButton.addEventListener("click", closeCopyDialog);
+confirmCopyButton.addEventListener("click", copySelectedVerses);
+copyDialog.addEventListener("click", (event) => {
+  if (event.target === copyDialog) closeCopyDialog();
 });
 searchForm.addEventListener("submit", (event) => {
   event.preventDefault();
