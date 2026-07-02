@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="여러 성경과 번역본을 나란히 읽는 다중 패널 성경 리더" />
+    <title>나란히 성경</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="brand-row">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">書</span>
+          <div>
+            <h1>나란히 성경</h1>
+            <p>여러 성경을 펼쳐, 한 절씩 함께 읽습니다.</p>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button class="button button-secondary" id="open-search" type="button">
+            <span aria-hidden="true">⌕</span> 통합 검색
+          </button>
+          <button class="button button-primary" id="add-panel" type="button">
+            <span aria-hidden="true">＋</span> 성경 패널 추가
+          </button>
+        </div>
+      </div>
+
+      <section class="translation-bar" aria-labelledby="translation-title">
+        <div class="translation-heading">
+          <strong id="translation-title">표시 역본과 순서</strong>
+          <span>체크해서 표시하고, 끌거나 화살표로 순서를 바꾸세요.</span>
+        </div>
+        <div class="translation-list" id="translation-list"></div>
+      </section>
+    </header>
+
+    <main class="workspace">
+      <div class="panel-track" id="panel-track" aria-live="polite"></div>
+    </main>
+
+    <dialog class="search-dialog" id="search-dialog">
+      <div class="search-shell">
+        <div class="search-header">
+          <div>
+            <span class="eyebrow">네 역본을 한 번에</span>
+            <h2>성경 본문 검색</h2>
+          </div>
+          <button class="icon-button" id="close-search" type="button" aria-label="검색 닫기">×</button>
+        </div>
+
+        <form class="search-form" id="search-form">
+          <label class="search-input-wrap" for="search-input">
+            <span aria-hidden="true">⌕</span>
+            <input
+              id="search-input"
+              name="query"
+              type="search"
+              minlength="2"
+              autocomplete="off"
+              placeholder="예: 사랑, 광야, kingdom"
+              required
+            />
+          </label>
+          <button class="button button-primary" type="submit">검색</button>
+        </form>
+
+        <div class="search-meta" id="search-meta">두 글자 이상 입력해 주세요.</div>
+        <div class="search-results" id="search-results"></div>
+      </div>
+    </dialog>
+
+    <template id="panel-template">
+      <article class="bible-panel">
+        <header class="panel-header">
+          <div class="panel-title-row">
+            <span class="panel-kicker">BIBLE PANEL</span>
+            <button class="icon-button remove-panel" type="button" aria-label="이 패널 닫기">×</button>
+          </div>
+          <div class="panel-selectors">
+            <label>
+              <span>성경</span>
+              <select class="book-select"></select>
+            </label>
+            <label>
+              <span>장</span>
+              <select class="chapter-select"></select>
+            </label>
+          </div>
+        </header>
+        <div class="panel-content" tabindex="0"></div>
+        <footer class="panel-footer">
+          <button class="chapter-nav previous-chapter" type="button" aria-label="이전 장">
+            <span aria-hidden="true">←</span><span>이전 장</span>
+          </button>
+          <span class="chapter-position"></span>
+          <button class="chapter-nav next-chapter" type="button" aria-label="다음 장">
+            <span>다음 장</span><span aria-hidden="true">→</span>
+          </button>
+        </footer>
+      </article>
+    </template>
+
+    <noscript>이 사이트는 성경 데이터를 표시하기 위해 JavaScript가 필요합니다.</noscript>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
