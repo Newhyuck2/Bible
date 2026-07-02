@@ -66,7 +66,7 @@ function sanitizeState() {
   }
   state.translationOrder = order;
   state.enabledTranslations = state.enabledTranslations.filter((id) => validTranslations.has(id));
-  state.fontSize = Math.max(12, Math.min(Number(state.fontSize) || 14, 22));
+  state.fontSize = Math.max(10, Math.min(Number(state.fontSize) || 14, 22));
   state.panels = state.panels
     .map((panel) => {
       const book = Math.max(0, Math.min(Number(panel.book) || 0, manifest.books.length - 1));
@@ -92,6 +92,10 @@ function saveState() {
 
 function translationMeta(id) {
   return manifest.translations.find((item) => item.id === id);
+}
+
+function translationLanguage(id) {
+  return id === "GAE" || id === "SAENEW" ? "ko" : "en";
 }
 
 function renderTranslationControls() {
@@ -128,6 +132,7 @@ function renderTranslationControls() {
     dot.className = "translation-dot";
     dot.style.setProperty("--translation-color", TRANSLATION_COLORS[id]);
     const name = document.createElement("span");
+    name.lang = translationLanguage(id);
     name.textContent = meta.label;
     label.append(checkbox, dot, name);
 
@@ -378,7 +383,7 @@ function createPanelElement(panelState, shouldScroll = false) {
 
   const bookItems = manifest.books.map((book, index) => ({
     value: index,
-    label: `${book.ko} · ${book.en}`,
+    label: `${book.en}, ${book.ko}`,
     ko: book.ko,
     en: book.en,
   }));
@@ -571,7 +576,7 @@ function renderPanelBody(panelState) {
       rendered += 1;
       const line = document.createElement("div");
       line.className = "translation-line";
-      line.lang = translation === "GAE" || translation === "SAENEW" ? "ko" : "en";
+      line.lang = translationLanguage(translation);
       line.style.setProperty("--translation-color", TRANSLATION_COLORS[translation]);
       const label = document.createElement("span");
       label.className = "translation-label";
@@ -634,12 +639,12 @@ function applyFontSize() {
   document.documentElement.style.setProperty("--verse-font-size", `${state.fontSize}px`);
   fontSizeValue.value = String(state.fontSize);
   fontSizeValue.textContent = String(state.fontSize);
-  fontSizeDownButton.disabled = state.fontSize <= 12;
+  fontSizeDownButton.disabled = state.fontSize <= 10;
   fontSizeUpButton.disabled = state.fontSize >= 22;
 }
 
 function changeFontSize(delta) {
-  state.fontSize = Math.max(12, Math.min(state.fontSize + delta, 22));
+  state.fontSize = Math.max(10, Math.min(state.fontSize + delta, 22));
   applyFontSize();
   saveState();
 }
@@ -668,6 +673,7 @@ function renderCopyTranslationOptions(checkedTranslations = null) {
     checkbox.value = translation;
     checkbox.checked = checked.has(translation);
     const text = document.createElement("span");
+    text.lang = translationLanguage(translation);
     text.textContent = translationMeta(translation).label;
     label.append(checkbox, text);
 
@@ -725,7 +731,10 @@ function openCopyDialog(panelState) {
   copyStatus.textContent = "";
   confirmCopyButton.textContent = "Copy";
   const book = manifest.books[panelState.book];
-  copyReference.textContent = `${book.ko} ${panelState.chapter}:${bounds[0]}–${bounds[1]}`;
+  const reference = bounds[0] === bounds[1]
+    ? `${panelState.chapter}:${bounds[0]}`
+    : `${panelState.chapter}:${bounds[0]}-${bounds[1]}`;
+  copyReference.textContent = `${book.en} ${book.ko} ${reference}`;
   const defaultTranslations = state.enabledTranslations.length
     ? new Set(state.enabledTranslations)
     : new Set(state.translationOrder);
@@ -878,6 +887,7 @@ function renderSearchResults(query, matches, truncated, elapsedMs) {
       row.style.setProperty("--translation-color", TRANSLATION_COLORS[line.translation]);
       const label = document.createElement("span");
       label.className = "search-match-label";
+      label.lang = translationLanguage(line.translation);
       label.textContent = translationMeta(line.translation).label;
       const text = document.createElement("span");
       appendHighlighted(text, line.text, query);

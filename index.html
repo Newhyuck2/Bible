@@ -10,6 +10,10 @@
   <body>
     <header class="app-header">
       <div class="compact-toolbar">
+        <div class="site-brand" aria-label="Holy Bible">
+          <span class="site-cross" aria-hidden="true">✝</span>
+          <span>Holy Bible</span>
+        </div>
         <div class="translation-list" id="translation-list" aria-label="Translation order"></div>
         <div class="font-size-control" aria-label="Bible text size">
           <button id="font-size-down" type="button" aria-label="Decrease text size">A−</button>
@@ -63,7 +67,10 @@
     <dialog class="copy-dialog" id="copy-dialog">
       <div class="copy-shell">
         <div class="copy-header">
-          <p id="copy-reference"></p>
+          <div>
+            <h2>Copy verses</h2>
+            <p id="copy-reference"></p>
+          </div>
           <button class="icon-button" id="close-copy" type="button" aria-label="Close copy options">×</button>
         </div>
 
@@ -96,42 +103,41 @@
       <article class="bible-panel">
         <header class="panel-header">
           <div class="panel-selectors">
-            <div class="combo book-combo">
-              <input
-                class="combo-input book-input"
-                type="text"
-                role="combobox"
-                aria-label="Book"
-                aria-autocomplete="list"
-                aria-expanded="false"
-                autocomplete="off"
-                spellcheck="false"
-              />
-              <button class="combo-toggle" type="button" tabindex="-1" aria-label="Open book list">⌄</button>
-              <div class="combo-menu" role="listbox"></div>
+            <div class="selector-control book-selector">
+              <span class="selector-label">Book</span>
+              <div class="combo book-combo">
+                <input
+                  class="combo-input book-input"
+                  type="text"
+                  role="combobox"
+                  aria-label="Book"
+                  aria-autocomplete="list"
+                  aria-expanded="false"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+                <button class="combo-toggle" type="button" tabindex="-1" aria-label="Open book list">⌄</button>
+                <div class="combo-menu" role="listbox"></div>
+              </div>
             </div>
-            <div class="combo chapter-combo">
-              <input
-                class="combo-input chapter-input"
-                type="text"
-                role="combobox"
-                aria-label="Chapter"
-                aria-autocomplete="list"
-                aria-expanded="false"
-                autocomplete="off"
-                inputmode="numeric"
-              />
-              <button class="combo-toggle" type="button" tabindex="-1" aria-label="Open chapter list">⌄</button>
-              <div class="combo-menu" role="listbox"></div>
+            <div class="selector-control chapter-selector">
+              <span class="selector-label">Chapter</span>
+              <div class="combo chapter-combo">
+                <input
+                  class="combo-input chapter-input"
+                  type="text"
+                  role="combobox"
+                  aria-label="Chapter"
+                  aria-autocomplete="list"
+                  aria-expanded="false"
+                  autocomplete="off"
+                  inputmode="numeric"
+                />
+                <button class="combo-toggle" type="button" tabindex="-1" aria-label="Open chapter list">⌄</button>
+                <div class="combo-menu" role="listbox"></div>
+              </div>
             </div>
-            <button class="icon-button remove-panel" type="button" aria-label="Delete panel">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M4 7h16"></path>
-                <path d="M9 7V4h6v3"></path>
-                <path d="M7 7l1 13h8l1-13"></path>
-                <path d="M10 11v5M14 11v5"></path>
-              </svg>
-            </button>
+            <button class="icon-button remove-panel" type="button" aria-label="Delete panel">×</button>
           </div>
         </header>
         <div class="panel-content" tabindex="0"></div>

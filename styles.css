@@ -1521,6 +1521,113 @@ mark {
 }
 
 /* Final compact toolbar overrides */
+body,
+body * {
+  font-family: "Segoe UI", "Malgun Gothic", sans-serif !important;
+}
+
+[lang="ko"] {
+  font-family: "Malgun Gothic", sans-serif !important;
+}
+
+[lang="en"] {
+  font-family: "Segoe UI", sans-serif !important;
+}
+
+:lang(ko) {
+  font-family: "Malgun Gothic", sans-serif !important;
+}
+
+:lang(en) {
+  font-family: "Segoe UI", sans-serif !important;
+}
+
+.site-brand {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.site-cross {
+  display: grid;
+  width: 27px;
+  height: 27px;
+  place-items: center;
+  border-radius: 7px;
+  background: var(--accent);
+  color: white;
+  font-size: 17px;
+  line-height: 1;
+}
+
+.panel-selectors {
+  grid-template-columns: minmax(150px, 1fr) 128px 32px;
+}
+
+.selector-control {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+}
+
+.selector-label {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.selector-control .combo {
+  flex: 1 1 auto;
+}
+
+.remove-panel {
+  font-size: 21px !important;
+  line-height: 1;
+}
+
+.verse-group {
+  padding-left: 32px;
+}
+
+.verse-number {
+  top: 11px;
+  left: 8px;
+  display: block;
+  width: auto;
+  height: auto;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.translation-line {
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 4px;
+}
+
+.translation-label {
+  margin-top: 2px;
+}
+
+.copy-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.copy-header p {
+  margin-top: 3px;
+}
+
 .translation-text {
   font-size: var(--verse-font-size);
 }
@@ -1659,6 +1766,20 @@ mark {
   }
 
   .panel-selectors {
-    grid-template-columns: minmax(135px, 1fr) 62px 32px;
+    grid-template-columns: minmax(135px, 1fr) 105px 30px;
+    gap: 4px;
+  }
+
+  .site-brand > span:last-child {
+    display: none;
+  }
+
+  .site-cross {
+    width: 25px;
+    height: 25px;
+  }
+
+  .selector-label {
+    font-size: 9px;
   }
 }
