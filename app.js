@@ -5,6 +5,8 @@ const TRANSLATION_COLORS = {
   GAE: "#2f7663",
   SAENEW: "#805692",
 };
+const MOBILE_LAYOUT_QUERY = "(max-width: 820px), (max-height: 500px) and (pointer: coarse)";
+const mobileLayout = window.matchMedia(MOBILE_LAYOUT_QUERY);
 
 const panelTrack = document.querySelector("#panel-track");
 const panelTemplate = document.querySelector("#panel-template");
@@ -204,6 +206,24 @@ function matchesBook(item, query) {
     && hangulInitials(item.ko).includes(compact);
 }
 
+function syncComboboxInputMode(input) {
+  if (!input.dataset.desktopInputMode) {
+    input.dataset.desktopInputMode = input.getAttribute("inputmode") || "default";
+  }
+  input.readOnly = mobileLayout.matches;
+  if (mobileLayout.matches) {
+    input.setAttribute("inputmode", "none");
+  } else if (input.dataset.desktopInputMode === "default") {
+    input.removeAttribute("inputmode");
+  } else {
+    input.setAttribute("inputmode", input.dataset.desktopInputMode);
+  }
+}
+
+mobileLayout.addEventListener("change", () => {
+  document.querySelectorAll(".combo-input").forEach(syncComboboxInputMode);
+});
+
 function setupCombobox({ input, toggle, menu, items, selectedValue, matches, onSelect }) {
   let allItems = items;
   let selected = selectedValue;
@@ -238,10 +258,7 @@ function setupCombobox({ input, toggle, menu, items, selectedValue, matches, onS
       option.setAttribute("role", "option");
       option.setAttribute("aria-selected", String(item.value === selected));
       option.textContent = item.label;
-      option.addEventListener("pointerdown", (event) => {
-        event.preventDefault();
-        choose(item);
-      });
+      option.addEventListener("click", () => choose(item));
       if (index === highlighted) option.classList.add("highlighted");
       menu.append(option);
     }
@@ -266,10 +283,13 @@ function setupCombobox({ input, toggle, menu, items, selectedValue, matches, onS
     render(selectText ? "" : input.value === selectedItem()?.label ? "" : input.value);
     menu.hidden = false;
     input.setAttribute("aria-expanded", "true");
-    if (selectText) input.select();
+    if (selectText && !input.readOnly) input.select();
   }
 
   input.addEventListener("focus", () => open(true));
+  input.addEventListener("click", () => {
+    if (input.readOnly) open(true);
+  });
   input.addEventListener("input", () => {
     render(input.value);
     menu.hidden = false;
@@ -303,6 +323,7 @@ function setupCombobox({ input, toggle, menu, items, selectedValue, matches, onS
     open(true);
   });
 
+  syncComboboxInputMode(input);
   choose(selectedItem(), false);
   close();
 
@@ -316,6 +337,73 @@ function setupCombobox({ input, toggle, menu, items, selectedValue, matches, onS
       choose(selectedItem(), false);
     },
   };
+}
+
+function setupPanelSwipe(panel, content, panelState) {
+  let gesture = null;
+  let suppressClick = false;
+
+  content.addEventListener("click", (event) => {
+    if (!suppressClick) return;
+    event.preventDefault();
+    event.stopPropagation();
+  }, true);
+
+  content.addEventListener("pointerdown", (event) => {
+    if (event.pointerType !== "touch" || !mobileLayout.matches || state.panels.length < 2) return;
+    gesture = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      startScrollLeft: panelTrack.scrollLeft,
+      axis: null,
+    };
+  });
+
+  content.addEventListener("pointermove", (event) => {
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+    const deltaX = event.clientX - gesture.startX;
+    const deltaY = event.clientY - gesture.startY;
+    const distanceX = Math.abs(deltaX);
+    const distanceY = Math.abs(deltaY);
+
+    if (!gesture.axis && Math.max(distanceX, distanceY) >= 8) {
+      gesture.axis = distanceX > distanceY * 1.15 ? "horizontal" : "vertical";
+    }
+    if (gesture.axis !== "horizontal") return;
+
+    event.preventDefault();
+    document.body.classList.add("swiping-panels");
+    panelTrack.scrollLeft = gesture.startScrollLeft - deltaX;
+  }, { passive: false });
+
+  const finish = (event, cancelled = false) => {
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+    if (gesture.axis === "horizontal") {
+      const deltaX = event.clientX - gesture.startX;
+      const currentIndex = state.panels.findIndex((item) => item.id === panelState.id);
+      const threshold = Math.min(70, panel.clientWidth * 0.18);
+      let targetIndex = currentIndex;
+      if (!cancelled && Math.abs(deltaX) >= threshold) {
+        targetIndex += deltaX < 0 ? 1 : -1;
+      }
+      targetIndex = Math.max(0, Math.min(targetIndex, state.panels.length - 1));
+      const targetState = state.panels[targetIndex];
+      const targetElements = panelElements.get(targetState.id);
+      targetElements?.panel.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+      if (targetState) setActivePanel(targetState.id);
+
+      suppressClick = true;
+      window.setTimeout(() => {
+        suppressClick = false;
+      }, 400);
+    }
+    document.body.classList.remove("swiping-panels");
+    gesture = null;
+  };
+
+  content.addEventListener("pointerup", (event) => finish(event));
+  content.addEventListener("pointercancel", (event) => finish(event, true));
 }
 
 function chapterItems(bookIndex) {
@@ -422,6 +510,7 @@ function createPanelElement(panelState, shouldScroll = false) {
   previous.addEventListener("click", () => navigateChapter(panelState, -1));
   next.addEventListener("click", () => navigateChapter(panelState, 1));
   setupPanelResize(panel, resizeHandle, panelState);
+  setupPanelSwipe(panel, content, panelState);
 
   panelElements.set(id, { panel, bookCombo, chapterCombo, content, copy, remove, previous, next });
   panelTrack.append(fragment);

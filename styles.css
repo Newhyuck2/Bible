@@ -1841,7 +1841,8 @@ body * {
   }
 
   .site-brand > span:last-child {
-    display: none;
+    display: inline;
+    font-size: 11px;
   }
 
   .site-cross {
@@ -1941,7 +1942,8 @@ body * {
   }
 
   .site-brand > span:last-child {
-    display: none;
+    display: inline;
+    font-size: 11px;
   }
 
   .site-cross {
@@ -1985,7 +1987,8 @@ body * {
   }
 
   .font-size-control output {
-    display: none;
+    display: block;
+    min-width: 18px;
   }
 
   .header-actions {
@@ -2038,38 +2041,24 @@ body * {
   }
 
   .panel-selectors {
-    grid-template-columns: 34px minmax(0, 1fr) minmax(0, 1fr) 34px;
-    grid-template-areas:
-      "remove book book book"
-      "previous chapter chapter next";
+    grid-template-columns: 30px minmax(98px, 1fr) 30px minmax(82px, 92px) 30px;
+    grid-template-areas: none;
     gap: 4px;
   }
 
-  .panel-selectors .remove-panel {
-    grid-area: remove;
-  }
-
-  .book-selector {
-    grid-area: book;
-  }
-
-  .panel-selectors .previous-chapter {
-    grid-area: previous;
-  }
-
-  .chapter-selector {
-    grid-area: chapter;
-  }
-
+  .panel-selectors .remove-panel,
+  .book-selector,
+  .panel-selectors .previous-chapter,
+  .chapter-selector,
   .panel-selectors .next-chapter {
-    grid-area: next;
+    grid-area: auto;
   }
 
   .panel-selectors .remove-panel,
   .panel-selectors .chapter-nav {
-    width: 34px;
-    height: 40px;
-    min-height: 40px;
+    width: 30px;
+    height: 34px;
+    min-height: 34px;
   }
 
   .selector-label {
@@ -2082,22 +2071,49 @@ body * {
   }
 
   .combo-input {
-    height: 40px;
-    padding-right: 29px;
-    padding-left: 7px;
-    font-size: 16px;
+    height: 34px;
+    padding-right: 27px;
+    padding-left: 6px;
+    font-size: 13px;
+  }
+
+  .combo-input[readonly] {
+    cursor: pointer;
+    caret-color: transparent;
+    user-select: none;
   }
 
   .combo-toggle {
-    width: 27px;
-    height: 36px;
+    width: 25px;
+    height: 30px;
+  }
+
+  .combo-menu {
+    max-height: min(260px, 42dvh);
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .book-combo .combo-menu {
+    width: min(260px, calc(100vw - 24px));
+    min-width: 0;
+  }
+
+  .combo-option {
+    min-height: 42px;
+    padding: 9px 8px;
   }
 
   .panel-content {
     padding: 0 10px 64px;
     overscroll-behavior-y: contain;
     scrollbar-width: thin;
+    touch-action: pan-y;
     -webkit-overflow-scrolling: touch;
+  }
+
+  .swiping-panels .panel-content {
+    user-select: none;
   }
 
   .verse-group {
@@ -2290,13 +2306,13 @@ body * {
 
 @media (max-width: 340px) {
   .panel-selectors {
-    grid-template-columns: 32px minmax(0, 1fr) minmax(0, 1fr) 32px;
+    grid-template-columns: 30px minmax(84px, 1fr) 30px 68px 30px;
     gap: 3px;
   }
 
   .panel-selectors .remove-panel,
   .panel-selectors .chapter-nav {
-    width: 32px;
+    width: 30px;
   }
 
   .selector-control {
@@ -2304,7 +2320,7 @@ body * {
   }
 
   .selector-label {
-    font-size: 8px;
+    display: none;
   }
 }
 
