@@ -1890,3 +1890,13 @@ body * {
   right: auto;
   left: auto;
 }
+
+.panel-selectors .chapter-nav svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
