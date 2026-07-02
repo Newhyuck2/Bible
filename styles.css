@@ -220,13 +220,6 @@ p {
   accent-color: var(--accent);
 }
 
-.translation-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--translation-color);
-}
-
 .drag-handle,
 .move-translation {
   display: grid;
@@ -282,11 +275,13 @@ p {
 }
 
 .bible-panel.active {
-  border-width: 3px;
-  border-color: var(--accent);
   box-shadow:
-    0 0 0 1px rgba(40, 79, 67, 0.18),
-    0 19px 50px rgba(40, 79, 67, 0.18);
+    0 0 0 2px var(--accent),
+    var(--shadow);
+}
+
+.translation-name {
+  color: var(--translation-color);
 }
 
 .panel-header {
@@ -1738,6 +1733,11 @@ body * {
 .copy-translation-option {
   gap: 5px;
   padding: 0 4px;
+  font-weight: 400;
+}
+
+.copy-translation-option label {
+  font-weight: 400;
 }
 
 .copy-order-option {

@@ -128,13 +128,12 @@ function renderTranslationControls() {
       refreshPanelBodies();
     });
 
-    const dot = document.createElement("span");
-    dot.className = "translation-dot";
-    dot.style.setProperty("--translation-color", TRANSLATION_COLORS[id]);
     const name = document.createElement("span");
+    name.className = "translation-name";
     name.lang = translationLanguage(id);
     name.textContent = meta.label;
-    label.append(checkbox, dot, name);
+    name.style.setProperty("--translation-color", TRANSLATION_COLORS[id]);
+    label.append(checkbox, name);
 
     const moveButtons = document.createElement("span");
     moveButtons.className = "move-buttons";
