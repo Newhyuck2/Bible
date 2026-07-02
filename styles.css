@@ -1740,6 +1740,14 @@ body * {
   font-weight: 400;
 }
 
+.panel-track {
+  padding-block: 2px;
+}
+
+.translation-line {
+  grid-template-columns: 42px minmax(0, 1fr);
+}
+
 .copy-order-option {
   align-items: center;
 }
