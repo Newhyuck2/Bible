@@ -282,8 +282,11 @@ p {
 }
 
 .bible-panel.active {
-  border-color: #8ba59c;
-  box-shadow: 0 19px 50px rgba(40, 79, 67, 0.15);
+  border-width: 3px;
+  border-color: var(--accent);
+  box-shadow:
+    0 0 0 1px rgba(40, 79, 67, 0.18),
+    0 19px 50px rgba(40, 79, 67, 0.18);
 }
 
 .panel-header {
