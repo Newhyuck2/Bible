@@ -17,7 +17,8 @@ const searchForm = document.querySelector("#search-form");
 const searchInput = document.querySelector("#search-input");
 const searchMeta = document.querySelector("#search-meta");
 const searchResults = document.querySelector("#search-results");
-const fontSizeInput = document.querySelector("#font-size");
+const fontSizeDownButton = document.querySelector("#font-size-down");
+const fontSizeUpButton = document.querySelector("#font-size-up");
 const fontSizeValue = document.querySelector("#font-size-value");
 const copyDialog = document.querySelector("#copy-dialog");
 const closeCopyButton = document.querySelector("#close-copy");
@@ -33,6 +34,7 @@ let activePanelId;
 let panelIdCounter = 0;
 let searchRequestId = 0;
 let copyPanelState = null;
+let copyTranslationOrder = [];
 const chapterCache = new Map();
 const panelElements = new Map();
 const searchWorker = new Worker("./search-worker.js");
@@ -361,7 +363,7 @@ function createPanelElement(panelState, shouldScroll = false) {
   const bookInput = fragment.querySelector(".book-input");
   const chapterInput = fragment.querySelector(".chapter-input");
   const content = fragment.querySelector(".panel-content");
-  const copy = fragment.querySelector(".copy-verses");
+  const copy = fragment.querySelector(".copy-selection");
   const remove = fragment.querySelector(".remove-panel");
   const previous = fragment.querySelector(".previous-chapter");
   const next = fragment.querySelector(".next-chapter");
@@ -457,7 +459,7 @@ function removePanel(id) {
 function updateRemoveButtons() {
   const disabled = state.panels.length === 1;
   for (const { remove } of panelElements.values()) {
-    remove.hidden = disabled;
+    remove.disabled = disabled;
   }
 }
 
@@ -492,7 +494,7 @@ function updatePanelSelection(panelState) {
     const verse = Number(group.dataset.verse);
     group.classList.toggle("selected", Boolean(bounds && verse >= bounds[0] && verse <= bounds[1]));
   });
-  elements.copy.disabled = !bounds;
+  elements.copy.hidden = !bounds;
 }
 
 function clearPanelSelection(panelState) {
@@ -630,9 +632,90 @@ function navigateChapter(panelState, direction) {
 
 function applyFontSize() {
   document.documentElement.style.setProperty("--verse-font-size", `${state.fontSize}px`);
-  fontSizeInput.value = String(state.fontSize);
   fontSizeValue.value = String(state.fontSize);
   fontSizeValue.textContent = String(state.fontSize);
+  fontSizeDownButton.disabled = state.fontSize <= 12;
+  fontSizeUpButton.disabled = state.fontSize >= 22;
+}
+
+function changeFontSize(delta) {
+  state.fontSize = Math.max(12, Math.min(state.fontSize + delta, 22));
+  applyFontSize();
+  saveState();
+}
+
+function renderCopyTranslationOptions(checkedTranslations = null) {
+  const checked = checkedTranslations ?? new Set(
+    [...copyTranslations.querySelectorAll('input[type="checkbox"]:checked')]
+      .map((checkbox) => checkbox.value),
+  );
+  copyTranslations.replaceChildren();
+
+  copyTranslationOrder.forEach((translation, index) => {
+    const item = document.createElement("div");
+    item.className = "copy-translation-option";
+    item.draggable = true;
+    item.dataset.translation = translation;
+
+    const handle = document.createElement("span");
+    handle.className = "copy-drag-handle";
+    handle.textContent = "⠿";
+    handle.title = "Drag to reorder";
+
+    const label = document.createElement("label");
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.value = translation;
+    checkbox.checked = checked.has(translation);
+    const text = document.createElement("span");
+    text.textContent = translationMeta(translation).label;
+    label.append(checkbox, text);
+
+    const moves = document.createElement("span");
+    moves.className = "copy-move-buttons";
+    const left = document.createElement("button");
+    left.type = "button";
+    left.textContent = "‹";
+    left.disabled = index === 0;
+    left.setAttribute("aria-label", `Move ${translationMeta(translation).label} left`);
+    left.addEventListener("click", () => moveCopyTranslation(index, index - 1));
+    const right = document.createElement("button");
+    right.type = "button";
+    right.textContent = "›";
+    right.disabled = index === copyTranslationOrder.length - 1;
+    right.setAttribute("aria-label", `Move ${translationMeta(translation).label} right`);
+    right.addEventListener("click", () => moveCopyTranslation(index, index + 1));
+    moves.append(left, right);
+
+    item.addEventListener("dragstart", (event) => {
+      item.classList.add("dragging");
+      event.dataTransfer.setData("text/plain", translation);
+      event.dataTransfer.effectAllowed = "move";
+    });
+    item.addEventListener("dragend", () => item.classList.remove("dragging"));
+    item.addEventListener("dragover", (event) => event.preventDefault());
+    item.addEventListener("drop", (event) => {
+      event.preventDefault();
+      const dragged = event.dataTransfer.getData("text/plain");
+      const from = copyTranslationOrder.indexOf(dragged);
+      const to = copyTranslationOrder.indexOf(translation);
+      if (from >= 0 && to >= 0 && from !== to) moveCopyTranslation(from, to);
+    });
+
+    item.append(handle, label, moves);
+    copyTranslations.append(item);
+  });
+}
+
+function moveCopyTranslation(from, to) {
+  if (to < 0 || to >= copyTranslationOrder.length) return;
+  const checked = new Set(
+    [...copyTranslations.querySelectorAll('input[type="checkbox"]:checked')]
+      .map((checkbox) => checkbox.value),
+  );
+  const [translation] = copyTranslationOrder.splice(from, 1);
+  copyTranslationOrder.splice(to, 0, translation);
+  renderCopyTranslationOptions(checked);
 }
 
 function openCopyDialog(panelState) {
@@ -643,23 +726,11 @@ function openCopyDialog(panelState) {
   confirmCopyButton.textContent = "Copy";
   const book = manifest.books[panelState.book];
   copyReference.textContent = `${book.ko} ${panelState.chapter}:${bounds[0]}–${bounds[1]}`;
-  copyTranslations.replaceChildren();
-
   const defaultTranslations = state.enabledTranslations.length
     ? new Set(state.enabledTranslations)
     : new Set(state.translationOrder);
-  for (const translation of state.translationOrder) {
-    const label = document.createElement("label");
-    label.className = "copy-translation-option";
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.value = translation;
-    checkbox.checked = defaultTranslations.has(translation);
-    const text = document.createElement("span");
-    text.textContent = translationMeta(translation).label;
-    label.append(checkbox, text);
-    copyTranslations.append(label);
-  }
+  copyTranslationOrder = [...state.translationOrder];
+  renderCopyTranslationOptions(defaultTranslations);
   copyDialog.showModal();
 }
 
@@ -673,18 +744,21 @@ function buildCopyText(panelState, translations, order) {
   const book = manifest.books[panelState.book];
   const verses = panelState.data.v.filter(([verse]) => verse >= start && verse <= end);
   const lines = [];
+  const bookNameFor = (translation) =>
+    translation === "ESV" || translation === "NIV" ? book.en : book.ko;
 
   if (order === "translation") {
     for (const translation of translations) {
-      lines.push(`${translationMeta(translation).label} — ${book.ko} ${panelState.chapter}:${start}–${end}`);
+      lines.push(`${translationMeta(translation).label} — ${bookNameFor(translation)} ${panelState.chapter}:${start}–${end}`);
       for (const [verse, texts] of verses) {
         if (texts[translation]) lines.push(`${verse} ${texts[translation]}`);
       }
       lines.push("");
     }
   } else {
+    const bookName = bookNameFor(translations[0]);
     for (const [verse, texts] of verses) {
-      lines.push(`${book.ko} ${panelState.chapter}:${verse}`);
+      lines.push(`${bookName} ${panelState.chapter}:${verse}`);
       for (const translation of translations) {
         if (texts[translation]) lines.push(`${translationMeta(translation).label} ${texts[translation]}`);
       }
@@ -870,11 +944,8 @@ async function init() {
 }
 
 addPanelButton.addEventListener("click", addPanel);
-fontSizeInput.addEventListener("input", () => {
-  state.fontSize = Number(fontSizeInput.value);
-  applyFontSize();
-});
-fontSizeInput.addEventListener("change", saveState);
+fontSizeDownButton.addEventListener("click", () => changeFontSize(-1));
+fontSizeUpButton.addEventListener("click", () => changeFontSize(1));
 openSearchButton.addEventListener("click", openSearch);
 closeSearchButton.addEventListener("click", closeSearch);
 searchDialog.addEventListener("click", (event) => {
