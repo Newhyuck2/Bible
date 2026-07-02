@@ -16,6 +16,7 @@ const closeSearchButton = document.querySelector("#close-search");
 const searchForm = document.querySelector("#search-form");
 const searchInput = document.querySelector("#search-input");
 const searchMeta = document.querySelector("#search-meta");
+const searchBookList = document.querySelector("#search-book-list");
 const searchResults = document.querySelector("#search-results");
 const fontSizeDownButton = document.querySelector("#font-size-down");
 const fontSizeUpButton = document.querySelector("#font-size-up");
@@ -824,6 +825,7 @@ function closeSearch() {
 
 function runSearch(query) {
   const translations = state.translationOrder.filter((id) => state.enabledTranslations.includes(id));
+  searchBookList.replaceChildren();
   searchResults.replaceChildren();
   if (!translations.length) {
     searchMeta.textContent = "Select at least one translation.";
@@ -840,13 +842,21 @@ searchWorker.addEventListener("message", (event) => {
   if (message.type === "progress") {
     searchMeta.textContent = message.text;
   } else if (message.type === "result") {
-    renderSearchResults(message.query, message.matches, message.truncated, message.elapsedMs);
+    renderSearchResults(
+      message.query,
+      message.matches,
+      message.bookCounts,
+      message.totalTranslationMatches,
+      message.truncated,
+      message.elapsedMs,
+    );
   } else if (message.type === "error") {
     searchMeta.textContent = `Search failed: ${message.error}`;
   }
 });
 
-function renderSearchResults(query, matches, truncated, elapsedMs) {
+function renderSearchResults(query, matches, bookCounts, totalTranslationMatches, truncated, elapsedMs) {
+  searchBookList.replaceChildren();
   searchResults.replaceChildren();
   const grouped = new Map();
   for (const [translation, book, chapter, verse, text] of matches) {
@@ -858,7 +868,8 @@ function renderSearchResults(query, matches, truncated, elapsedMs) {
     (a, b) => a.book - b.book || a.chapter - b.chapter || a.verse - b.verse,
   );
 
-  searchMeta.textContent = `${groups.length.toLocaleString()} verses · ${matches.length.toLocaleString()} translation matches · ${(elapsedMs / 1000).toFixed(1)}s${truncated ? " · Top results shown" : ""}`;
+  const totalVerses = bookCounts.reduce((sum, [, count]) => sum + count, 0);
+  searchMeta.textContent = `${totalVerses.toLocaleString()} verses · ${totalTranslationMatches.toLocaleString()} translation matches · ${(elapsedMs / 1000).toFixed(1)}s${truncated ? " · Top results shown" : ""}`;
 
   if (!groups.length) {
     const empty = document.createElement("div");
@@ -868,13 +879,45 @@ function renderSearchResults(query, matches, truncated, elapsedMs) {
     return;
   }
 
+  for (const [bookIndex, count] of bookCounts) {
+    const book = manifest.books[bookIndex];
+    const link = document.createElement("button");
+    link.className = "search-book-link";
+    link.type = "button";
+    link.textContent = `${book.en} ${book.ko} (${count.toLocaleString()})`;
+    link.addEventListener("click", () => {
+      searchBookList.querySelectorAll(".search-book-link").forEach((item) => {
+        item.toggleAttribute("aria-current", item === link);
+      });
+      const target = searchResults.querySelector(`.search-result[data-book="${bookIndex}"]`);
+      target?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    searchBookList.append(link);
+  }
+
   for (const result of groups) {
     const button = document.createElement("button");
     button.className = "search-result";
     button.type = "button";
+    button.dataset.book = String(result.book);
     const reference = document.createElement("div");
     reference.className = "search-reference";
-    reference.innerHTML = `<span>${escapeHtml(manifest.books[result.book].en)} ${result.chapter}:${result.verse}</span><span aria-hidden="true">→</span>`;
+    const referenceText = document.createElement("span");
+    const resultLanguages = new Set(result.lines.map((line) => translationLanguage(line.translation)));
+    const book = manifest.books[result.book];
+    if (resultLanguages.size === 1 && resultLanguages.has("ko")) {
+      referenceText.lang = "ko";
+      referenceText.textContent = `${book.ko} ${result.chapter}:${result.verse}`;
+    } else if (resultLanguages.size === 1 && resultLanguages.has("en")) {
+      referenceText.lang = "en";
+      referenceText.textContent = `${book.en} ${result.chapter}:${result.verse}`;
+    } else {
+      referenceText.textContent = `${book.en} ${book.ko} ${result.chapter}:${result.verse}`;
+    }
+    const arrow = document.createElement("span");
+    arrow.setAttribute("aria-hidden", "true");
+    arrow.textContent = "→";
+    reference.append(referenceText, arrow);
     button.append(reference);
 
     result.lines.sort(

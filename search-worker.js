@@ -1,5 +1,5 @@
 const cache = new Map();
-const MAX_MATCHES_PER_TRANSLATION = 250;
+const MAX_MATCHES_PER_TRANSLATION_PER_BOOK = 25;
 
 async function loadTranslation(translation) {
   if (cache.has(translation)) return cache.get(translation);
@@ -29,27 +29,40 @@ self.addEventListener("message", async (event) => {
 
     const needle = query.normalize("NFKC").toLocaleLowerCase();
     const matches = [];
+    const verseKeysByBook = new Map();
+    let totalTranslationMatches = 0;
     let truncated = false;
 
     for (const [translation, rows] of datasets) {
-      let translationMatches = 0;
+      const displayedByBook = new Map();
       for (const [book, chapter, verse, text] of rows) {
         if (text.normalize("NFKC").toLocaleLowerCase().includes(needle)) {
-          matches.push([translation, book, chapter, verse, text]);
-          translationMatches += 1;
-          if (translationMatches >= MAX_MATCHES_PER_TRANSLATION) {
+          totalTranslationMatches += 1;
+          if (!verseKeysByBook.has(book)) verseKeysByBook.set(book, new Set());
+          verseKeysByBook.get(book).add(`${chapter}:${verse}`);
+
+          const displayed = displayedByBook.get(book) ?? 0;
+          if (displayed < MAX_MATCHES_PER_TRANSLATION_PER_BOOK) {
+            matches.push([translation, book, chapter, verse, text]);
+            displayedByBook.set(book, displayed + 1);
+          } else {
             truncated = true;
-            break;
           }
         }
       }
     }
+
+    const bookCounts = [...verseKeysByBook]
+      .map(([book, verses]) => [book, verses.size])
+      .sort((a, b) => a[0] - b[0]);
 
     self.postMessage({
       type: "result",
       requestId,
       query,
       matches,
+      bookCounts,
+      totalTranslationMatches,
       truncated,
       elapsedMs: performance.now() - started,
     });
