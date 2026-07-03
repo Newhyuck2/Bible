@@ -6,7 +6,7 @@ const TRANSLATION_COLORS = {
   SAENEW: "#805692",
   WLB: "#a24f62",
 };
-const ASSET_VERSION = "20260703-2";
+const ASSET_VERSION = document.querySelector('meta[name="asset-version"]').content;
 const MOBILE_LAYOUT_QUERY = "(max-width: 820px), (max-height: 500px) and (pointer: coarse)";
 const mobileLayout = window.matchMedia(MOBILE_LAYOUT_QUERY);
 
@@ -32,6 +32,9 @@ const confirmCopyButton = document.querySelector("#confirm-copy");
 const copyReference = document.querySelector("#copy-reference");
 const copyTranslations = document.querySelector("#copy-translations");
 const copyStatus = document.querySelector("#copy-status");
+const siteBrand = document.querySelector("#site-brand");
+const updateBanner = document.querySelector("#update-banner");
+const updateReloadButton = document.querySelector("#update-reload");
 
 let manifest;
 let state;
@@ -95,6 +98,28 @@ function saveState() {
   );
 }
 
+function resetSite() {
+  if (searchDialog.open) closeSearch();
+  if (copyDialog.open) closeCopyDialog();
+  localStorage.removeItem(STORAGE_KEY);
+
+  for (const { panel } of panelElements.values()) panel.remove();
+  panelElements.clear();
+  state = freshState();
+  sanitizeState();
+  activePanelId = undefined;
+  applyFontSize();
+  renderTranslationControls();
+  for (const panel of state.panels) createPanelElement(panel);
+  saveState();
+
+  searchInput.value = "";
+  searchMeta.textContent = "Enter at least two characters.";
+  searchBookList.replaceChildren();
+  searchResults.replaceChildren();
+  searchRequestId += 1;
+}
+
 function translationMeta(id) {
   return manifest.translations.find((item) => item.id === id);
 }
@@ -124,6 +149,15 @@ function renderTranslationControls() {
     handle.textContent = "⠿";
     handle.title = "Drag to reorder";
     handle.setAttribute("aria-hidden", "true");
+    setupTouchReorder({
+      item: chip,
+      handle,
+      container: translationList,
+      itemClass: "translation-chip",
+      id,
+      getOrder: () => state.translationOrder,
+      onReorder: moveTranslation,
+    });
 
     const toggleTranslation = () => {
       const shouldEnable = !state.enabledTranslations.includes(id);
@@ -199,6 +233,68 @@ function moveTranslation(from, to) {
   saveState();
   renderTranslationControls();
   refreshPanelBodies();
+}
+
+// Native HTML5 drag-and-drop (dragstart/dragover/drop) does not fire on touch
+// input, so touch reordering is driven by Pointer Events instead: the dragged
+// item is lifted with a transform, elementFromPoint finds the item underneath
+// the finger, and the swap only happens once on release (mirroring the mouse
+// drop handler above).
+function setupTouchReorder({ item, handle, container, itemClass, id, getOrder, onReorder }) {
+  handle.addEventListener("pointerdown", (event) => {
+    if (event.pointerType !== "touch") return;
+    event.preventDefault();
+    event.stopPropagation();
+    const pointerId = event.pointerId;
+    const startX = event.clientX;
+    const startY = event.clientY;
+    let hoverTarget = null;
+
+    handle.setPointerCapture(pointerId);
+    item.classList.add("dragging");
+    item.style.position = "relative";
+    item.style.zIndex = "5";
+    item.style.pointerEvents = "none";
+    document.body.classList.add("reordering-chip");
+
+    const move = (moveEvent) => {
+      if (moveEvent.pointerId !== pointerId) return;
+      const dx = moveEvent.clientX - startX;
+      const dy = moveEvent.clientY - startY;
+      item.style.transform = `translate(${dx}px, ${dy}px)`;
+      const target = document
+        .elementFromPoint(moveEvent.clientX, moveEvent.clientY)
+        ?.closest(`.${itemClass}`);
+      const next = target && target !== item && target.parentElement === container ? target : null;
+      if (hoverTarget && hoverTarget !== next) hoverTarget.classList.remove("drag-over");
+      hoverTarget = next;
+      hoverTarget?.classList.add("drag-over");
+    };
+
+    const finish = () => {
+      handle.releasePointerCapture(pointerId);
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", finish);
+      handle.removeEventListener("pointercancel", finish);
+      item.classList.remove("dragging");
+      item.style.position = "";
+      item.style.zIndex = "";
+      item.style.pointerEvents = "";
+      item.style.transform = "";
+      document.body.classList.remove("reordering-chip");
+      hoverTarget?.classList.remove("drag-over");
+      if (hoverTarget) {
+        const order = getOrder();
+        const from = order.indexOf(id);
+        const to = order.indexOf(hoverTarget.dataset.translation);
+        if (from >= 0 && to >= 0 && from !== to) onReorder(from, to);
+      }
+    };
+
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", finish);
+    handle.addEventListener("pointercancel", finish);
+  });
 }
 
 const HANGUL_INITIALS = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ";
@@ -776,6 +872,15 @@ function renderCopyTranslationOptions(checkedTranslations = null) {
     handle.className = "copy-drag-handle";
     handle.textContent = "⠿";
     handle.title = "Drag to reorder";
+    setupTouchReorder({
+      item,
+      handle,
+      container: copyTranslations,
+      itemClass: "copy-translation-option",
+      id: translation,
+      getOrder: () => copyTranslationOrder,
+      onReorder: moveCopyTranslation,
+    });
 
     const text = document.createElement("span");
     text.className = "copy-translation-name";
@@ -1120,6 +1225,12 @@ async function init() {
   }
 }
 
+siteBrand.addEventListener("click", resetSite);
+siteBrand.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" && event.key !== " ") return;
+  event.preventDefault();
+  resetSite();
+});
 addPanelButton.addEventListener("click", addPanel);
 fontSizeDownButton.addEventListener("click", () => changeFontSize(-1));
 fontSizeUpButton.addEventListener("click", () => changeFontSize(1));
@@ -1140,5 +1251,27 @@ searchForm.addEventListener("submit", (event) => {
   if (query.length < 2) return;
   runSearch(query);
 });
+
+// GitHub Pages' CDN can keep serving a stale index.html/app.js for a while
+// after a deploy, and an already-open tab never re-fetches it on its own.
+// Poll a tiny no-store JSON file so both cases surface a manual refresh
+// prompt instead of silently showing outdated content.
+async function checkForUpdate() {
+  try {
+    const response = await fetch(`./version.json?_=${Date.now()}`, { cache: "no-store" });
+    if (!response.ok) return;
+    const data = await response.json();
+    if (data.build && data.build !== ASSET_VERSION) updateBanner.hidden = false;
+  } catch {
+    // Offline or blocked request; the next scheduled check will retry.
+  }
+}
+
+updateReloadButton.addEventListener("click", () => window.location.reload());
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) checkForUpdate();
+});
+window.setInterval(checkForUpdate, 5 * 60 * 1000);
+checkForUpdate();
 
 init();
