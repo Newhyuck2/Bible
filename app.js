@@ -7,9 +7,9 @@ const TRANSLATION_COLORS = {
   WLB: "#a24f62",
 };
 const ASSET_VERSION = document.querySelector('meta[name="asset-version"]').content;
-const MOBILE_LAYOUT_QUERY = "(max-width: 820px), (max-height: 500px) and (pointer: coarse)";
+const MOBILE_LAYOUT_QUERY = "(max-width: 820px), (pointer: coarse)";
 const mobileLayout = window.matchMedia(MOBILE_LAYOUT_QUERY);
-const landscapeMobile = window.matchMedia("(orientation: landscape) and (max-height: 500px) and (pointer: coarse)");
+const landscapeMobile = window.matchMedia("(orientation: landscape) and (pointer: coarse)");
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
 const panelTrack = document.querySelector("#panel-track");
@@ -845,7 +845,7 @@ function collapsePanel(panel, done) {
   window.setTimeout(finish, 460);
 }
 
-function movePanel(from, to) {
+function movePanel(from, to, { animate = true } = {}) {
   if (from === to || from < 0 || to < 0 || to >= state.panels.length) return;
   const previousLefts = new Map(
     state.panels.map((panelState) => [
@@ -861,7 +861,7 @@ function movePanel(from, to) {
   saveState();
   updatePanelNumbers();
   updatePanelMoveButtons();
-  if (reducedMotion.matches) return;
+  if (!animate || reducedMotion.matches) return;
   for (const [panelId, oldLeft] of previousLefts) {
     const panel = panelElements.get(panelId)?.panel;
     if (!panel) continue;
@@ -964,11 +964,18 @@ function setupLandscapePanelLongPress(panel, panelState) {
     suppressClickUntil = Date.now() + 450;
     if (targetIndex >= 0) {
       const from = state.panels.findIndex((item) => item.id === panelState.id);
-      movePanel(from, targetIndex);
-      panelTrack.scrollLeft = panelScrollLeft(pairStart);
-      requestAnimationFrame(() => {
+      movePanel(from, targetIndex, { animate: false });
+      const alignVisiblePair = () => {
         panelTrack.scrollLeft = panelScrollLeft(pairStart);
-        panelTrack.classList.remove("panel-reorder-active");
+      };
+      alignVisiblePair();
+      requestAnimationFrame(() => {
+        alignVisiblePair();
+        requestAnimationFrame(() => {
+          alignVisiblePair();
+          panelTrack.classList.remove("panel-reorder-active");
+          alignVisiblePair();
+        });
       });
     } else {
       panelTrack.classList.remove("panel-reorder-active");

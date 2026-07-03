@@ -1961,8 +1961,8 @@ body * {
   stroke-width: 1.8;
 }
 
-/* Mobile reading experience */
-@media (max-width: 820px), (max-height: 500px) and (pointer: coarse) {
+/* Mobile and tablet reading experience */
+@media (max-width: 820px), (pointer: coarse) {
   html,
   body {
     width: 100%;
@@ -2418,8 +2418,8 @@ body * {
   white-space: nowrap;
 }
 
-/* A landscape phone shows two panels and advances one panel per swipe. */
-@media (orientation: landscape) and (max-height: 500px) and (pointer: coarse) {
+/* A landscape touch device shows two panels and advances one panel per swipe. */
+@media (orientation: landscape) and (pointer: coarse) {
   .bible-panel {
     flex: 0 0 calc((100vw - 20px) / 2);
     flex-basis: calc((100vw - 20px) / 2) !important;
@@ -2510,7 +2510,7 @@ body * {
   overflow-anchor: none;
 }
 
-@media (max-width: 820px), (max-height: 500px) and (pointer: coarse) {
+@media (max-width: 820px), (pointer: coarse) {
   .panel-selectors {
     grid-template-columns: 30px 24px minmax(78px, 1fr) 30px minmax(70px, 92px) 30px;
     gap: 4px;
@@ -2541,7 +2541,7 @@ body * {
 
 /* Landscape swaps the visible pair by badge drag. (No ::after spacer here:
    the track must always end on a full pair so two panels stay visible.) */
-@media (orientation: landscape) and (max-height: 500px) and (pointer: coarse) {
+@media (orientation: landscape) and (pointer: coarse) {
   .panel-number {
     cursor: grab;
   }
@@ -2662,9 +2662,17 @@ body * {
   border-radius: 8px;
   background: white;
   color: var(--ink);
-  font-size: 22px;
-  line-height: 1;
   box-shadow: 0 5px 14px rgba(37, 35, 31, 0.14);
+}
+
+.cancel-selection svg {
+  display: block;
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 2;
 }
 
 .cancel-selection:hover {
@@ -2674,6 +2682,7 @@ body * {
 
 .panel-track.panel-reorder-active {
   overflow-x: hidden;
+  scroll-behavior: auto;
   scroll-snap-type: none;
 }
 
@@ -2686,7 +2695,7 @@ body * {
   will-change: transform;
 }
 
-@media (max-width: 820px), (max-height: 500px) and (pointer: coarse) {
+@media (max-width: 820px), (pointer: coarse) {
   .copy-selection {
     left: calc(50% - 25px);
   }
@@ -2696,11 +2705,15 @@ body * {
     left: calc(50% + 25px);
     width: 44px;
     height: 44px;
-    font-size: 25px;
+  }
+
+  .cancel-selection svg {
+    width: 19px;
+    height: 19px;
   }
 }
 
-@media (orientation: landscape) and (max-height: 500px) and (pointer: coarse) {
+@media (orientation: landscape) and (pointer: coarse) {
   .panel-number {
     cursor: default;
   }
