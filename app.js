@@ -106,10 +106,16 @@ function renderTranslationControls() {
 
   state.translationOrder.forEach((id, index) => {
     const meta = translationMeta(id);
+    const isEnabled = state.enabledTranslations.includes(id);
     const chip = document.createElement("div");
     chip.className = "translation-chip";
+    chip.classList.toggle("selected", isEnabled);
     chip.draggable = true;
     chip.dataset.translation = id;
+    chip.tabIndex = 0;
+    chip.setAttribute("role", "checkbox");
+    chip.setAttribute("aria-checked", String(isEnabled));
+    chip.setAttribute("aria-label", `${meta.label} translation`);
 
     const handle = document.createElement("span");
     handle.className = "drag-handle";
@@ -117,26 +123,24 @@ function renderTranslationControls() {
     handle.title = "Drag to reorder";
     handle.setAttribute("aria-hidden", "true");
 
-    const label = document.createElement("label");
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.checked = state.enabledTranslations.includes(id);
-    checkbox.addEventListener("change", () => {
-      if (checkbox.checked) {
+    const toggleTranslation = () => {
+      const shouldEnable = !state.enabledTranslations.includes(id);
+      if (shouldEnable) {
         state.enabledTranslations.push(id);
       } else {
         state.enabledTranslations = state.enabledTranslations.filter((item) => item !== id);
       }
       saveState();
+      chip.classList.toggle("selected", shouldEnable);
+      chip.setAttribute("aria-checked", String(shouldEnable));
       refreshPanelBodies();
-    });
+    };
 
     const name = document.createElement("span");
     name.className = "translation-name";
     name.lang = translationLanguage(id);
     name.textContent = meta.label;
     name.style.setProperty("--translation-color", TRANSLATION_COLORS[id]);
-    label.append(checkbox, name);
 
     const moveButtons = document.createElement("span");
     moveButtons.className = "move-buttons";
@@ -170,8 +174,18 @@ function renderTranslationControls() {
       const to = state.translationOrder.indexOf(id);
       if (from >= 0 && to >= 0 && from !== to) moveTranslation(from, to);
     });
+    chip.addEventListener("click", (event) => {
+      if (event.target.closest("button, .drag-handle")) return;
+      toggleTranslation();
+    });
+    chip.addEventListener("keydown", (event) => {
+      if (event.target !== chip) return;
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      toggleTranslation();
+    });
 
-    chip.append(handle, label, moveButtons);
+    chip.append(handle, name, moveButtons);
     translationList.append(chip);
   });
 }
@@ -390,7 +404,7 @@ function setupPanelSwipe(panel, content, panelState) {
       targetIndex = Math.max(0, Math.min(targetIndex, state.panels.length - 1));
       const targetState = state.panels[targetIndex];
       const targetElements = panelElements.get(targetState.id);
-      targetElements?.panel.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+      targetElements?.panel.scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" });
       if (targetState) setActivePanel(targetState.id);
 
       suppressClick = true;
@@ -740,31 +754,32 @@ function changeFontSize(delta) {
 
 function renderCopyTranslationOptions(checkedTranslations = null) {
   const checked = checkedTranslations ?? new Set(
-    [...copyTranslations.querySelectorAll('input[type="checkbox"]:checked')]
-      .map((checkbox) => checkbox.value),
+    [...copyTranslations.querySelectorAll(".copy-translation-option.selected")]
+      .map((item) => item.dataset.translation),
   );
   copyTranslations.replaceChildren();
 
   copyTranslationOrder.forEach((translation, index) => {
     const item = document.createElement("div");
     item.className = "copy-translation-option";
+    item.classList.toggle("selected", checked.has(translation));
     item.draggable = true;
     item.dataset.translation = translation;
+    item.tabIndex = 0;
+    item.setAttribute("role", "checkbox");
+    item.setAttribute("aria-checked", String(checked.has(translation)));
+    item.setAttribute("aria-label", `${translationMeta(translation).label} translation`);
 
     const handle = document.createElement("span");
     handle.className = "copy-drag-handle";
     handle.textContent = "⠿";
     handle.title = "Drag to reorder";
 
-    const label = document.createElement("label");
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.value = translation;
-    checkbox.checked = checked.has(translation);
     const text = document.createElement("span");
+    text.className = "copy-translation-name";
     text.lang = translationLanguage(translation);
     text.textContent = translationMeta(translation).label;
-    label.append(checkbox, text);
+    text.style.setProperty("--translation-color", TRANSLATION_COLORS[translation]);
 
     const moves = document.createElement("span");
     moves.className = "copy-move-buttons";
@@ -796,8 +811,23 @@ function renderCopyTranslationOptions(checkedTranslations = null) {
       const to = copyTranslationOrder.indexOf(translation);
       if (from >= 0 && to >= 0 && from !== to) moveCopyTranslation(from, to);
     });
+    const toggleCopyTranslation = () => {
+      const selected = !item.classList.contains("selected");
+      item.classList.toggle("selected", selected);
+      item.setAttribute("aria-checked", String(selected));
+    };
+    item.addEventListener("click", (event) => {
+      if (event.target.closest("button, .copy-drag-handle")) return;
+      toggleCopyTranslation();
+    });
+    item.addEventListener("keydown", (event) => {
+      if (event.target !== item) return;
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      toggleCopyTranslation();
+    });
 
-    item.append(handle, label, moves);
+    item.append(handle, text, moves);
     copyTranslations.append(item);
   });
 }
@@ -805,8 +835,8 @@ function renderCopyTranslationOptions(checkedTranslations = null) {
 function moveCopyTranslation(from, to) {
   if (to < 0 || to >= copyTranslationOrder.length) return;
   const checked = new Set(
-    [...copyTranslations.querySelectorAll('input[type="checkbox"]:checked')]
-      .map((checkbox) => checkbox.value),
+    [...copyTranslations.querySelectorAll(".copy-translation-option.selected")]
+      .map((item) => item.dataset.translation),
   );
   const [translation] = copyTranslationOrder.splice(from, 1);
   copyTranslationOrder.splice(to, 0, translation);
@@ -844,10 +874,13 @@ function buildCopyText(panelState, translations, order) {
   const lines = [];
   const bookNameFor = (translation) =>
     translation === "ESV" || translation === "NIV" ? book.en : book.ko;
+  const range = start === end
+    ? `${panelState.chapter}:${start}`
+    : `${panelState.chapter}:${start}-${end}`;
 
   if (order === "translation") {
     for (const translation of translations) {
-      lines.push(`${translationMeta(translation).label} — ${bookNameFor(translation)} ${panelState.chapter}:${start}–${end}`);
+      lines.push(`${bookNameFor(translation)} ${range}, ${translationMeta(translation).label}`);
       for (const [verse, texts] of verses) {
         if (texts[translation]) lines.push(`${verse} ${texts[translation]}`);
       }
@@ -855,10 +888,11 @@ function buildCopyText(panelState, translations, order) {
     }
   } else {
     const bookName = bookNameFor(translations[0]);
+    const translationNames = translations.map((translation) => translationMeta(translation).label).join("-");
     for (const [verse, texts] of verses) {
-      lines.push(`${bookName} ${panelState.chapter}:${verse}`);
+      lines.push(`${bookName} ${panelState.chapter}:${verse}, ${translationNames}`);
       for (const translation of translations) {
-        if (texts[translation]) lines.push(`${translationMeta(translation).label} ${texts[translation]}`);
+        if (texts[translation]) lines.push(`${verse} ${translationMeta(translation).label} — ${texts[translation]}`);
       }
       lines.push("");
     }
@@ -885,8 +919,8 @@ async function writeClipboard(text) {
 
 async function copySelectedVerses() {
   if (!copyPanelState) return;
-  const translations = [...copyTranslations.querySelectorAll('input[type="checkbox"]:checked')]
-    .map((checkbox) => checkbox.value);
+  const translations = [...copyTranslations.querySelectorAll(".copy-translation-option.selected")]
+    .map((item) => item.dataset.translation);
   if (!translations.length) {
     copyStatus.textContent = "Select a translation.";
     return;
