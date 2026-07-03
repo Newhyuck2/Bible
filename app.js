@@ -9,6 +9,8 @@ const TRANSLATION_COLORS = {
 const ASSET_VERSION = document.querySelector('meta[name="asset-version"]').content;
 const MOBILE_LAYOUT_QUERY = "(max-width: 820px), (max-height: 500px) and (pointer: coarse)";
 const mobileLayout = window.matchMedia(MOBILE_LAYOUT_QUERY);
+const landscapeMobile = window.matchMedia("(orientation: landscape) and (max-height: 500px) and (pointer: coarse)");
+const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
 const panelTrack = document.querySelector("#panel-track");
 const panelTemplate = document.querySelector("#panel-template");
@@ -43,6 +45,7 @@ let panelIdCounter = 0;
 let searchRequestId = 0;
 let copyPanelState = null;
 let copyTranslationOrder = [];
+let panelMutationInProgress = false;
 const chapterCache = new Map();
 const panelElements = new Map();
 const searchWorker = new Worker(`./search-worker.js?v=${ASSET_VERSION}`);
@@ -336,6 +339,37 @@ mobileLayout.addEventListener("change", () => {
   document.querySelectorAll(".combo-input").forEach(syncComboboxInputMode);
 });
 
+function panelScrollLeft(index) {
+  const panelState = state.panels[index];
+  const panel = panelState ? panelElements.get(panelState.id)?.panel : null;
+  if (!panel) return panelTrack.scrollLeft;
+  const paddingLeft = Number.parseFloat(getComputedStyle(panelTrack).paddingLeft) || 0;
+  return Math.max(0, panel.offsetLeft - paddingLeft);
+}
+
+function panelIndexAtViewportStart() {
+  if (!state?.panels?.length) return 0;
+  let closestIndex = 0;
+  let closestDistance = Number.POSITIVE_INFINITY;
+  state.panels.forEach((panelState, index) => {
+    if (!panelElements.has(panelState.id)) return;
+    const distance = Math.abs(panelTrack.scrollLeft - panelScrollLeft(index));
+    if (distance < closestDistance) {
+      closestDistance = distance;
+      closestIndex = index;
+    }
+  });
+  return closestIndex;
+}
+
+function scrollToPanelIndex(index, behavior = "smooth", activate = true) {
+  if (!state.panels.length) return;
+  const targetIndex = Math.max(0, Math.min(index, state.panels.length - 1));
+  panelTrack.scrollTo({ left: panelScrollLeft(targetIndex), behavior });
+  const targetState = state.panels[targetIndex];
+  if (activate && targetState) setActivePanel(targetState.id);
+}
+
 function setupCombobox({ input, toggle, menu, items, selectedValue, matches, onSelect }) {
   let allItems = items;
   let selected = selectedValue;
@@ -451,7 +485,7 @@ function setupCombobox({ input, toggle, menu, items, selectedValue, matches, onS
   };
 }
 
-function setupPanelSwipe(panel, content, panelState) {
+function setupPanelSwipe(panel, content) {
   let gesture = null;
   let suppressClick = false;
 
@@ -468,6 +502,7 @@ function setupPanelSwipe(panel, content, panelState) {
       startX: event.clientX,
       startY: event.clientY,
       startScrollLeft: panelTrack.scrollLeft,
+      startIndex: panelIndexAtViewportStart(),
       axis: null,
     };
   });
@@ -493,17 +528,13 @@ function setupPanelSwipe(panel, content, panelState) {
     if (!gesture || gesture.pointerId !== event.pointerId) return;
     if (gesture.axis === "horizontal") {
       const deltaX = event.clientX - gesture.startX;
-      const currentIndex = state.panels.findIndex((item) => item.id === panelState.id);
       const threshold = Math.min(70, panel.clientWidth * 0.18);
-      let targetIndex = currentIndex;
+      let targetIndex = gesture.startIndex;
       if (!cancelled && Math.abs(deltaX) >= threshold) {
         targetIndex += deltaX < 0 ? 1 : -1;
       }
       targetIndex = Math.max(0, Math.min(targetIndex, state.panels.length - 1));
-      const targetState = state.panels[targetIndex];
-      const targetElements = panelElements.get(targetState.id);
-      targetElements?.panel.scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" });
-      if (targetState) setActivePanel(targetState.id);
+      scrollToPanelIndex(targetIndex);
 
       suppressClick = true;
       window.setTimeout(() => {
@@ -623,7 +654,7 @@ function createPanelElement(panelState, shouldScroll = false) {
   previous.addEventListener("click", () => navigateChapter(panelState, -1));
   next.addEventListener("click", () => navigateChapter(panelState, 1));
   setupPanelResize(panel, resizeHandle, panelState);
-  setupPanelSwipe(panel, content, panelState);
+  setupPanelSwipe(panel, content);
 
   panelElements.set(id, { panel, bookCombo, chapterCombo, content, copy, remove, panelNumber, previous, next });
   panelTrack.append(fragment);
@@ -635,6 +666,7 @@ function createPanelElement(panelState, shouldScroll = false) {
   if (shouldScroll) {
     requestAnimationFrame(() => panel.scrollIntoView({ behavior: "smooth", inline: "end", block: "nearest" }));
   }
+  return panel;
 }
 
 function setActivePanel(id) {
@@ -645,24 +677,96 @@ function setActivePanel(id) {
 }
 
 function addPanel() {
+  if (panelMutationInProgress) return;
+  const previousCount = state.panels.length;
+  const viewportStart = panelIndexAtViewportStart();
   const source = state.panels.find((panel) => panel.id === activePanelId) ?? state.panels.at(-1);
   const panelState = { book: source?.book ?? 0, chapter: source?.chapter ?? 1, width: source?.width ?? null };
   state.panels.push(panelState);
   saveState();
-  createPanelElement(panelState, true);
+  const panel = createPanelElement(panelState, !landscapeMobile.matches);
+  if (landscapeMobile.matches) {
+    panel.animate(
+      [
+        { opacity: 0, transform: "translateX(24px)" },
+        { opacity: 1, transform: "translateX(0)" },
+      ],
+      { duration: reducedMotion.matches ? 0 : 280, easing: "cubic-bezier(.2,.75,.25,1)" },
+    );
+    const targetIndex = previousCount < 2 ? 0 : Math.min(viewportStart + 1, state.panels.length - 1);
+    requestAnimationFrame(() => scrollToPanelIndex(targetIndex, "smooth", false));
+  }
 }
 
-function removePanel(id) {
-  if (state.panels.length === 1) return;
+function animatePanelReflow(previousRects) {
+  if (reducedMotion.matches) return;
+  for (const [panelId, oldRect] of previousRects) {
+    const panel = panelElements.get(panelId)?.panel;
+    if (!panel) continue;
+    const newRect = panel.getBoundingClientRect();
+    const deltaX = oldRect.left - newRect.left;
+    if (Math.abs(deltaX) < 1) continue;
+    panel.animate(
+      [
+        { transform: `translateX(${deltaX}px)` },
+        { transform: "translateX(0)" },
+      ],
+      { duration: 280, easing: "cubic-bezier(.2,.75,.25,1)" },
+    );
+  }
+}
+
+async function removePanel(id) {
+  if (state.panels.length === 1 || panelMutationInProgress) return;
   const index = state.panels.findIndex((panel) => panel.id === id);
   if (index < 0) return;
-  state.panels.splice(index, 1);
-  panelElements.get(id)?.panel.remove();
-  panelElements.delete(id);
-  if (activePanelId === id) setActivePanel(state.panels[Math.max(0, index - 1)].id);
-  saveState();
-  updatePanelNumbers();
-  updateRemoveButtons();
+  panelMutationInProgress = true;
+  const isLast = index === state.panels.length - 1;
+  const viewportStart = panelIndexAtViewportStart();
+  const loneLastPanelInLandscape = landscapeMobile.matches && isLast && viewportStart === index && index > 0;
+  const removedPanel = panelElements.get(id)?.panel;
+  const previousRects = new Map(
+    state.panels
+      .filter((panelState) => panelState.id !== id)
+      .map((panelState) => [panelState.id, panelElements.get(panelState.id).panel.getBoundingClientRect()]),
+  );
+  const previousScrollLeft = panelTrack.scrollLeft;
+
+  try {
+    if (!isLast && removedPanel && !reducedMotion.matches) {
+      removedPanel.classList.add("panel-removing");
+      await removedPanel.animate(
+        [
+          { opacity: 1, transform: "scale(1)" },
+          { opacity: 0, transform: "scale(.96)" },
+        ],
+        { duration: 180, easing: "ease-in", fill: "forwards" },
+      ).finished;
+    }
+
+    state.panels.splice(index, 1);
+    removedPanel?.remove();
+    panelElements.delete(id);
+    panelTrack.scrollLeft = previousScrollLeft;
+    const nextActiveIndex = Math.min(index, state.panels.length - 1);
+    if (activePanelId === id) setActivePanel(state.panels[nextActiveIndex].id);
+    saveState();
+    updatePanelNumbers();
+    updateRemoveButtons();
+
+    if (!isLast) {
+      if (mobileLayout.matches) {
+        scrollToPanelIndex(Math.min(viewportStart, state.panels.length - 1), "auto", false);
+      }
+      animatePanelReflow(previousRects);
+    } else if (loneLastPanelInLandscape) {
+      requestAnimationFrame(() => scrollToPanelIndex(Math.max(0, state.panels.length - 2), "smooth", false));
+    } else if (mobileLayout.matches && !landscapeMobile.matches) {
+      requestAnimationFrame(() => scrollToPanelIndex(Math.max(0, state.panels.length - 1), "smooth", false));
+    }
+  } finally {
+    panelMutationInProgress = false;
+  }
 }
 
 function updatePanelNumbers() {
