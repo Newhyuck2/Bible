@@ -655,6 +655,7 @@ function createPanelElement(panelState, shouldScroll = false) {
   next.addEventListener("click", () => navigateChapter(panelState, 1));
   setupPanelResize(panel, resizeHandle, panelState);
   setupPanelSwipe(panel, content);
+  setupPanelDrag(panel, panelNumber, panelState);
 
   panelElements.set(id, { panel, bookCombo, chapterCombo, content, copy, remove, panelNumber, previous, next });
   panelTrack.append(fragment);
@@ -796,6 +797,106 @@ function collapsePanel(panel, done) {
     if (event.target === panel && event.propertyName === "flex-basis") finish();
   });
   window.setTimeout(finish, 460);
+}
+
+function movePanel(from, to) {
+  if (from === to || from < 0 || to < 0 || to >= state.panels.length) return;
+  const previousLefts = new Map(
+    state.panels.map((panelState) => [
+      panelState.id,
+      panelElements.get(panelState.id).panel.getBoundingClientRect().left,
+    ]),
+  );
+  const [moved] = state.panels.splice(from, 1);
+  state.panels.splice(to, 0, moved);
+  const movedPanel = panelElements.get(moved.id).panel;
+  const nextState = state.panels[to + 1];
+  panelTrack.insertBefore(movedPanel, nextState ? panelElements.get(nextState.id).panel : null);
+  saveState();
+  updatePanelNumbers();
+  if (reducedMotion.matches) return;
+  for (const [panelId, oldLeft] of previousLefts) {
+    const panel = panelElements.get(panelId)?.panel;
+    if (!panel) continue;
+    const delta = oldLeft - panel.getBoundingClientRect().left;
+    if (Math.abs(delta) < 1) continue;
+    panel.animate(
+      [{ transform: `translateX(${delta}px)` }, { transform: "translateX(0)" }],
+      { duration: 260, easing: "cubic-bezier(.2,.75,.25,1)" },
+    );
+  }
+}
+
+// Dragging a panel's number badge moves the whole panel: anywhere in the
+// row on desktop, but in landscape mobile only a swap with the other panel
+// of the visible pair. Portrait mobile shows one panel per screen, so
+// badge-drag reordering is disabled there.
+function setupPanelDrag(panel, badge, panelState) {
+  badge.addEventListener("pointerdown", (event) => {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    if (mobileLayout.matches && !landscapeMobile.matches) return;
+    if (panelMutationInProgress || state.panels.length < 2) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setActivePanel(panelState.id);
+    const pointerId = event.pointerId;
+    const startX = event.clientX;
+    const landscapePair = landscapeMobile.matches ? panelIndexAtViewportStart() : null;
+    let hoverTarget = null;
+
+    badge.setPointerCapture(pointerId);
+    badge.classList.add("dragging");
+    panel.classList.add("panel-dragging");
+    panel.style.pointerEvents = "none";
+    document.body.classList.add("reordering-chip");
+    // Mandatory snap re-snaps toward the dragged panel's transformed
+    // position, scrolling the track out from under the pointer.
+    panelTrack.classList.add("removing-panel");
+
+    const allowedTarget = (candidate) => {
+      if (!candidate || candidate === panel || candidate.parentElement !== panelTrack) return null;
+      if (landscapePair === null) return candidate;
+      const myIndex = state.panels.findIndex((item) => item.id === panelState.id);
+      const candidateIndex = state.panels.findIndex((item) => item.id === candidate.dataset.panelId);
+      const neighbor = myIndex === landscapePair ? landscapePair + 1 : landscapePair;
+      return candidateIndex === neighbor ? candidate : null;
+    };
+
+    const move = (moveEvent) => {
+      if (moveEvent.pointerId !== pointerId) return;
+      panel.style.transform = `translateX(${moveEvent.clientX - startX}px)`;
+      const under = document
+        .elementFromPoint(moveEvent.clientX, moveEvent.clientY)
+        ?.closest(".bible-panel");
+      const next = allowedTarget(under);
+      if (hoverTarget && hoverTarget !== next) hoverTarget.classList.remove("drop-target");
+      hoverTarget = next;
+      hoverTarget?.classList.add("drop-target");
+    };
+
+    const finish = () => {
+      badge.releasePointerCapture(pointerId);
+      badge.removeEventListener("pointermove", move);
+      badge.removeEventListener("pointerup", finish);
+      badge.removeEventListener("pointercancel", finish);
+      badge.classList.remove("dragging");
+      panel.classList.remove("panel-dragging");
+      panel.style.transform = "";
+      panel.style.pointerEvents = "";
+      document.body.classList.remove("reordering-chip");
+      if (!panelTrack.querySelector(".panel-removing")) panelTrack.classList.remove("removing-panel");
+      hoverTarget?.classList.remove("drop-target");
+      if (hoverTarget) {
+        const from = state.panels.findIndex((item) => item.id === panelState.id);
+        const to = state.panels.findIndex((item) => item.id === hoverTarget.dataset.panelId);
+        if (from >= 0 && to >= 0 && from !== to) movePanel(from, to);
+      }
+    };
+
+    badge.addEventListener("pointermove", move);
+    badge.addEventListener("pointerup", finish);
+    badge.addEventListener("pointercancel", finish);
+  });
 }
 
 function updatePanelNumbers() {

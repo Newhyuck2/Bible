@@ -1162,7 +1162,9 @@ mark {
   width: var(--removed-width, auto);
 }
 
-/* Scroll snapping fights the shrinking layout mid-animation. */
+/* Scroll snapping fights the shrinking layout mid-removal, and during a
+   badge drag it chases the dragged panel's transform, scrolling the track
+   out from under the pointer. */
 .panel-track.removing-panel {
   scroll-snap-type: none;
   scroll-behavior: auto;
@@ -2473,14 +2475,35 @@ body * {
   height: 26px;
   align-self: center;
   place-items: center;
-  border: 1px solid var(--accent);
+  border: 1px solid var(--line-strong);
   border-radius: 8px;
-  background: var(--accent);
-  color: white;
+  background: #f6f1e7;
+  color: #7a4f28;
   font-size: 11px;
   font-weight: 800;
   line-height: 1;
   user-select: none;
+  cursor: grab;
+  touch-action: none;
+}
+
+.panel-number.dragging {
+  border-color: #a7c9b8;
+  background: var(--accent-soft);
+  color: var(--accent);
+  cursor: grabbing;
+}
+
+/* The panel being dragged by its number badge follows the pointer. */
+.bible-panel.panel-dragging {
+  z-index: 6;
+  opacity: 0.88;
+  transition: none;
+}
+
+.bible-panel.drop-target {
+  outline: 2px dashed var(--accent);
+  outline-offset: 3px;
 }
 
 .panel-track {
@@ -2493,9 +2516,13 @@ body * {
     gap: 4px;
   }
 
+  /* Portrait shows one panel per screen, so badge-drag reordering is off
+     (the script ignores the gesture); touch-action stays "none" so a swipe
+     starting on the badge cannot become a browser back-navigation. */
   .panel-number {
     width: 24px;
     height: 24px;
+    cursor: default;
   }
 }
 
@@ -2512,10 +2539,10 @@ body * {
   }
 }
 
+/* Landscape swaps the visible pair by badge drag. (No ::after spacer here:
+   the track must always end on a full pair so two panels stay visible.) */
 @media (orientation: landscape) and (max-height: 500px) and (pointer: coarse) {
-  .panel-track::after {
-    display: block;
-    flex: 0 0 calc((100vw - 20px) / 2);
-    content: "";
+  .panel-number {
+    cursor: grab;
   }
 }
