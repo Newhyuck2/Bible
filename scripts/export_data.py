@@ -17,6 +17,7 @@ TRANSLATIONS = [
     {"id": "NIV", "label": "NIV", "name": "New International Version"},
     {"id": "GAE", "label": "개역개정", "name": "Korean Revised Version"},
     {"id": "SAENEW", "label": "새번역", "name": "Korean New Translation"},
+    {"id": "WLB", "label": "우리말", "name": "Woorimal Bible"},
 ]
 
 KOREAN_BOOK_NAMES = [

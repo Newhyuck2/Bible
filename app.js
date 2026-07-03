@@ -4,6 +4,7 @@ const TRANSLATION_COLORS = {
   NIV: "#476f9b",
   GAE: "#2f7663",
   SAENEW: "#805692",
+  WLB: "#a24f62",
 };
 const MOBILE_LAYOUT_QUERY = "(max-width: 820px), (max-height: 500px) and (pointer: coarse)";
 const mobileLayout = window.matchMedia(MOBILE_LAYOUT_QUERY);
@@ -44,8 +45,8 @@ const searchWorker = new Worker("./search-worker.js");
 
 function freshState() {
   return {
-    translationOrder: ["ESV", "NIV", "GAE", "SAENEW"],
-    enabledTranslations: ["ESV", "NIV", "GAE", "SAENEW"],
+    translationOrder: ["ESV", "NIV", "GAE", "SAENEW", "WLB"],
+    enabledTranslations: ["ESV", "NIV", "GAE", "SAENEW", "WLB"],
     fontSize: 14,
     panels: [{ book: 0, chapter: 1 }],
   };
@@ -98,7 +99,7 @@ function translationMeta(id) {
 }
 
 function translationLanguage(id) {
-  return id === "GAE" || id === "SAENEW" ? "ko" : "en";
+  return id === "ESV" || id === "NIV" ? "en" : "ko";
 }
 
 function renderTranslationControls() {
@@ -873,7 +874,7 @@ function buildCopyText(panelState, translations, order) {
   const verses = panelState.data.v.filter(([verse]) => verse >= start && verse <= end);
   const lines = [];
   const bookNameFor = (translation) =>
-    translation === "ESV" || translation === "NIV" ? book.en : book.ko;
+    translationLanguage(translation) === "en" ? book.en : book.ko;
   const range = start === end
     ? `${panelState.chapter}:${start}`
     : `${panelState.chapter}:${start}-${end}`;
