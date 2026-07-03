@@ -2753,27 +2753,3 @@ body * {
     height: calc(100dvh - 46px - env(safe-area-inset-top));
   }
 }
-
-/* Mobile: the page header slides away with reading scroll and the panels
-   grow to fill the whole screen. --app-header-shift is driven from app.js. */
-@media (max-width: 820px), (pointer: coarse) {
-  body {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .app-header {
-    flex: none;
-    margin-top: calc(-1 * var(--app-header-shift, 0px));
-  }
-
-  body.app-header-settling .app-header {
-    transition: margin-top 180ms ease;
-  }
-
-  .workspace {
-    flex: 1 1 auto;
-    min-height: 0;
-    height: auto;
-  }
-}

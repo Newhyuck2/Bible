@@ -12,7 +12,6 @@ const mobileLayout = window.matchMedia(MOBILE_LAYOUT_QUERY);
 const landscapeMobile = window.matchMedia("(orientation: landscape) and (pointer: coarse)");
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
-const appHeader = document.querySelector(".app-header");
 const panelTrack = document.querySelector("#panel-track");
 const panelTemplate = document.querySelector("#panel-template");
 const translationList = document.querySelector("#translation-list");
@@ -488,16 +487,15 @@ function setupCombobox({ input, toggle, menu, items, selectedValue, matches, onS
   };
 }
 
-function findTouch(touches, id) {
-  for (let index = 0; index < touches.length; index += 1) {
-    if (touches[index].identifier === id) return touches[index];
-  }
-  return null;
-}
-
 function setupPanelSwipe(panel, content) {
   let gesture = null;
   let suppressClick = false;
+  const findTouch = (touches, id) => {
+    for (let index = 0; index < touches.length; index += 1) {
+      if (touches[index].identifier === id) return touches[index];
+    }
+    return null;
+  };
 
   content.addEventListener("click", (event) => {
     if (!suppressClick) return;
@@ -567,124 +565,6 @@ function setupPanelSwipe(panel, content) {
   content.addEventListener("touchend", (event) => finish(event));
   content.addEventListener("touchcancel", (event) => finish(event, true));
 }
-
-// Mobile only: the page header slides away in sync with reading scroll and the
-// panels grow to fill the freed space. It stays hidden until a panel is
-// scrolled fully to the top and the reader keeps pulling down.
-const appHeaderCollapse = { shift: 0, hidden: false, settleTimer: 0, idleTimer: 0 };
-
-function appHeaderShiftMax() {
-  return appHeader ? appHeader.offsetHeight : 0;
-}
-
-function applyAppHeaderShift(next, animate = false) {
-  const max = appHeaderShiftMax();
-  const value = Math.max(0, Math.min(next, max));
-  appHeaderCollapse.shift = value;
-  appHeaderCollapse.hidden = max > 0 && value >= max - 0.5;
-  window.clearTimeout(appHeaderCollapse.settleTimer);
-  if (animate && !reducedMotion.matches) {
-    document.body.classList.add("app-header-settling");
-    appHeaderCollapse.settleTimer = window.setTimeout(() => {
-      document.body.classList.remove("app-header-settling");
-    }, 220);
-  } else {
-    document.body.classList.remove("app-header-settling");
-  }
-  document.documentElement.style.setProperty("--app-header-shift", `${value}px`);
-}
-
-function settleAppHeaderShift() {
-  const max = appHeaderShiftMax();
-  if (appHeaderCollapse.shift <= 0 || appHeaderCollapse.shift >= max) return;
-  applyAppHeaderShift(appHeaderCollapse.shift >= max / 2 ? max : 0, true);
-}
-
-function scheduleAppHeaderSettle() {
-  window.clearTimeout(appHeaderCollapse.idleTimer);
-  appHeaderCollapse.idleTimer = window.setTimeout(settleAppHeaderShift, 160);
-}
-
-function setupAppHeaderAutoHide(content) {
-  let lastScrollTop = content.scrollTop;
-  let scheduled = false;
-
-  content.addEventListener("scroll", () => {
-    if (scheduled) return;
-    scheduled = true;
-    requestAnimationFrame(() => {
-      scheduled = false;
-      const currentScrollTop = Math.max(0, content.scrollTop);
-      const delta = currentScrollTop - lastScrollTop;
-      lastScrollTop = currentScrollTop;
-      if (!mobileLayout.matches || delta <= 0) return;
-      if (appHeaderCollapse.shift >= appHeaderShiftMax()) return;
-      applyAppHeaderShift(appHeaderCollapse.shift + delta);
-      scheduleAppHeaderSettle();
-    });
-  }, { passive: true });
-
-  let touch = null;
-
-  content.addEventListener("touchstart", (event) => {
-    touch = null;
-    if (!mobileLayout.matches || event.touches.length !== 1) return;
-    const start = event.touches[0];
-    touch = {
-      id: start.identifier,
-      startX: start.clientX,
-      startY: start.clientY,
-      lastY: start.clientY,
-      axis: null,
-    };
-  }, { passive: true });
-
-  content.addEventListener("touchmove", (event) => {
-    if (!touch) return;
-    const point = findTouch(event.touches, touch.id);
-    if (!point) return;
-    if (!touch.axis) {
-      const distanceX = Math.abs(point.clientX - touch.startX);
-      const distanceY = Math.abs(point.clientY - touch.startY);
-      if (Math.max(distanceX, distanceY) >= 8) {
-        touch.axis = distanceX > distanceY * 1.15 ? "horizontal" : "vertical";
-      }
-    }
-    const step = point.clientY - touch.lastY;
-    touch.lastY = point.clientY;
-    if (touch.axis !== "vertical" || step <= 0) return;
-    if (content.scrollTop > 0 || appHeaderCollapse.shift <= 0) return;
-    event.preventDefault();
-    applyAppHeaderShift(appHeaderCollapse.shift - step);
-  }, { passive: false });
-
-  const endTouch = () => {
-    if (!touch) return;
-    touch = null;
-    settleAppHeaderShift();
-  };
-  content.addEventListener("touchend", endTouch);
-  content.addEventListener("touchcancel", endTouch);
-
-  // Narrow windows and touch laptops reach the mobile layout with a wheel.
-  content.addEventListener("wheel", (event) => {
-    if (!mobileLayout.matches || event.deltaY >= 0) return;
-    if (content.scrollTop > 0 || appHeaderCollapse.shift <= 0) return;
-    applyAppHeaderShift(appHeaderCollapse.shift + event.deltaY);
-    scheduleAppHeaderSettle();
-  }, { passive: true });
-}
-
-window.addEventListener("resize", () => {
-  if (!mobileLayout.matches || appHeaderCollapse.shift <= 0) return;
-  applyAppHeaderShift(
-    appHeaderCollapse.hidden ? Number.POSITIVE_INFINITY : appHeaderCollapse.shift,
-  );
-});
-
-mobileLayout.addEventListener("change", () => {
-  if (!mobileLayout.matches) applyAppHeaderShift(0);
-});
 
 function chapterItems(bookIndex) {
   return Array.from({ length: manifest.books[bookIndex].chapters }, (_, index) => ({
@@ -822,7 +702,6 @@ function createPanelElement(panelState, shouldScroll = false) {
   setupPanelResize(panel, resizeHandle, panelState);
   setupPanelMoveReveal(panel, moveLeft, moveRight);
   setupPanelSwipe(panel, content);
-  setupAppHeaderAutoHide(content);
   setupLandscapePanelLongPress(panel, panelState);
 
   panelElements.set(id, {
