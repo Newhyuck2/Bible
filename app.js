@@ -490,6 +490,12 @@ function setupCombobox({ input, toggle, menu, items, selectedValue, matches, onS
 function setupPanelSwipe(panel, content) {
   let gesture = null;
   let suppressClick = false;
+  const findTouch = (touches, id) => {
+    for (let index = 0; index < touches.length; index += 1) {
+      if (touches[index].identifier === id) return touches[index];
+    }
+    return null;
+  };
 
   content.addEventListener("click", (event) => {
     if (!suppressClick) return;
@@ -497,22 +503,29 @@ function setupPanelSwipe(panel, content) {
     event.stopPropagation();
   }, true);
 
-  content.addEventListener("pointerdown", (event) => {
-    if (event.pointerType !== "touch" || !mobileLayout.matches || state.panels.length < 2) return;
+  content.addEventListener("touchstart", (event) => {
+    if (!mobileLayout.matches || state.panels.length < 2 || event.touches.length !== 1) return;
+    const touch = event.touches[0];
     gesture = {
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startY: event.clientY,
+      touchId: touch.identifier,
+      startX: touch.clientX,
+      startY: touch.clientY,
       startScrollLeft: panelTrack.scrollLeft,
       startIndex: panelIndexAtViewportStart(),
       axis: null,
     };
-  });
+  }, { passive: true });
 
-  content.addEventListener("pointermove", (event) => {
-    if (!gesture || gesture.pointerId !== event.pointerId) return;
-    const deltaX = event.clientX - gesture.startX;
-    const deltaY = event.clientY - gesture.startY;
+  content.addEventListener("touchmove", (event) => {
+    if (!gesture) return;
+    if (panelTrack.classList.contains("panel-reorder-active")) {
+      gesture = null;
+      return;
+    }
+    const touch = findTouch(event.touches, gesture.touchId);
+    if (!touch) return;
+    const deltaX = touch.clientX - gesture.startX;
+    const deltaY = touch.clientY - gesture.startY;
     const distanceX = Math.abs(deltaX);
     const distanceY = Math.abs(deltaY);
 
@@ -527,9 +540,11 @@ function setupPanelSwipe(panel, content) {
   }, { passive: false });
 
   const finish = (event, cancelled = false) => {
-    if (!gesture || gesture.pointerId !== event.pointerId) return;
+    if (!gesture) return;
+    const touch = findTouch(event.changedTouches, gesture.touchId);
+    if (!touch) return;
     if (gesture.axis === "horizontal") {
-      const deltaX = event.clientX - gesture.startX;
+      const deltaX = touch.clientX - gesture.startX;
       const threshold = Math.min(70, panel.clientWidth * 0.18);
       let targetIndex = gesture.startIndex;
       if (!cancelled && Math.abs(deltaX) >= threshold) {
@@ -547,8 +562,49 @@ function setupPanelSwipe(panel, content) {
     gesture = null;
   };
 
-  content.addEventListener("pointerup", (event) => finish(event));
-  content.addEventListener("pointercancel", (event) => finish(event, true));
+  content.addEventListener("touchend", (event) => finish(event));
+  content.addEventListener("touchcancel", (event) => finish(event, true));
+}
+
+function setupPanelHeaderAutoHide(panel, content) {
+  let lastScrollTop = content.scrollTop;
+  let direction = 0;
+  let distance = 0;
+  let scheduled = false;
+
+  content.addEventListener("scroll", () => {
+    if (scheduled) return;
+    scheduled = true;
+    requestAnimationFrame(() => {
+      scheduled = false;
+      const currentScrollTop = Math.max(0, content.scrollTop);
+      const delta = currentScrollTop - lastScrollTop;
+      lastScrollTop = currentScrollTop;
+
+      if (currentScrollTop <= 8) {
+        panel.classList.remove("panel-header-hidden");
+        direction = 0;
+        distance = 0;
+        return;
+      }
+      if (Math.abs(delta) < 0.5) return;
+
+      const nextDirection = delta > 0 ? 1 : -1;
+      if (nextDirection !== direction) {
+        direction = nextDirection;
+        distance = 0;
+      }
+      distance += Math.abs(delta);
+
+      if (direction > 0 && distance >= 18) {
+        panel.classList.add("panel-header-hidden");
+        distance = 0;
+      } else if (direction < 0 && distance >= 7) {
+        panel.classList.remove("panel-header-hidden");
+        distance = 0;
+      }
+    });
+  }, { passive: true });
 }
 
 function chapterItems(bookIndex) {
@@ -614,6 +670,7 @@ function createPanelElement(panelState, shouldScroll = false) {
   panelState.id = id;
   const fragment = panelTemplate.content.cloneNode(true);
   const panel = fragment.querySelector(".bible-panel");
+  const header = fragment.querySelector(".panel-header");
   const bookInput = fragment.querySelector(".book-input");
   const chapterInput = fragment.querySelector(".chapter-input");
   const content = fragment.querySelector(".panel-content");
@@ -686,10 +743,12 @@ function createPanelElement(panelState, shouldScroll = false) {
   setupPanelResize(panel, resizeHandle, panelState);
   setupPanelMoveReveal(panel, moveLeft, moveRight);
   setupPanelSwipe(panel, content);
+  setupPanelHeaderAutoHide(panel, content);
   setupLandscapePanelLongPress(panel, panelState);
 
   panelElements.set(id, {
     panel,
+    header,
     bookCombo,
     chapterCombo,
     content,
@@ -879,6 +938,12 @@ function movePanel(from, to, { animate = true } = {}) {
 function setupLandscapePanelLongPress(panel, panelState) {
   let gesture = null;
   let suppressClickUntil = 0;
+  const findTouch = (touches, id) => {
+    for (let index = 0; index < touches.length; index += 1) {
+      if (touches[index].identifier === id) return touches[index];
+    }
+    return null;
+  };
 
   panel.addEventListener("click", (event) => {
     if (Date.now() >= suppressClickUntil) return;
@@ -886,37 +951,39 @@ function setupLandscapePanelLongPress(panel, panelState) {
     event.stopImmediatePropagation();
   }, true);
 
-  panel.addEventListener("pointerdown", (event) => {
-    if (event.pointerType !== "touch" || !landscapeMobile.matches) return;
+  panel.addEventListener("touchstart", (event) => {
+    if (!landscapeMobile.matches || event.touches.length !== 1) return;
     if (panelMutationInProgress || state.panels.length < 2) return;
     if (event.target.closest("button, input, .combo-menu, .panel-resize-handle")) return;
 
-    const pointerId = event.pointerId;
+    const touch = event.touches[0];
+    const touchId = touch.identifier;
     const pairStart = Math.min(panelIndexAtViewportStart(), Math.max(0, state.panels.length - 2));
     gesture = {
-      pointerId,
-      startX: event.clientX,
-      startY: event.clientY,
+      touchId,
+      startX: touch.clientX,
+      startY: touch.clientY,
       pairStart,
       active: false,
       targetIndex: -1,
       timer: window.setTimeout(() => {
-        if (!gesture || gesture.pointerId !== pointerId) return;
+        if (!gesture || gesture.touchId !== touchId) return;
         gesture.active = true;
         setActivePanel(panelState.id);
-        panel.setPointerCapture(pointerId);
         panel.classList.add("panel-longpress-dragging");
         panel.style.transform = "scale(0.97)";
         panelTrack.classList.add("panel-reorder-active");
         document.body.classList.add("reordering-chip");
       }, 430),
     };
-  });
+  }, { passive: true });
 
-  panel.addEventListener("pointermove", (event) => {
-    if (!gesture || event.pointerId !== gesture.pointerId) return;
-    const dx = event.clientX - gesture.startX;
-    const dy = event.clientY - gesture.startY;
+  panel.addEventListener("touchmove", (event) => {
+    if (!gesture) return;
+    const touch = findTouch(event.touches, gesture.touchId);
+    if (!touch) return;
+    const dx = touch.clientX - gesture.startX;
+    const dy = touch.clientY - gesture.startY;
     if (!gesture.active) {
       if (Math.hypot(dx, dy) >= 9) {
         window.clearTimeout(gesture.timer);
@@ -948,7 +1015,7 @@ function setupLandscapePanelLongPress(panel, panelState) {
   }, { passive: false });
 
   const finish = (event) => {
-    if (!gesture || event.pointerId !== gesture.pointerId) return;
+    if (!gesture || !findTouch(event.changedTouches, gesture.touchId)) return;
     window.clearTimeout(gesture.timer);
     const { active, targetIndex, pairStart } = gesture;
     gesture = null;
@@ -956,7 +1023,6 @@ function setupLandscapePanelLongPress(panel, panelState) {
 
     event.preventDefault();
     event.stopPropagation();
-    if (panel.hasPointerCapture(event.pointerId)) panel.releasePointerCapture(event.pointerId);
     panel.classList.remove("panel-longpress-dragging");
     panel.style.transform = "";
     document.body.classList.remove("reordering-chip");
@@ -982,8 +1048,8 @@ function setupLandscapePanelLongPress(panel, panelState) {
     }
   };
 
-  panel.addEventListener("pointerup", finish);
-  panel.addEventListener("pointercancel", finish);
+  panel.addEventListener("touchend", finish);
+  panel.addEventListener("touchcancel", finish);
   panel.addEventListener("contextmenu", (event) => {
     if (panel.classList.contains("panel-longpress-dragging")) event.preventDefault();
   });
@@ -1055,6 +1121,7 @@ function updatePanelSelection(panelState) {
   });
   elements.copy.hidden = !bounds;
   elements.cancelSelection.hidden = !bounds;
+  if (bounds) elements.panel.classList.remove("panel-header-hidden");
 }
 
 function clearPanelSelection(panelState) {
@@ -1087,6 +1154,7 @@ async function loadPanel(panelState, targetVerse = null) {
   if (!elements) return;
   const requestKey = `${panelState.book}:${panelState.chapter}:${Date.now()}`;
   elements.panel.dataset.requestKey = requestKey;
+  elements.panel.classList.remove("panel-header-hidden");
   clearPanelSelection(panelState);
   elements.content.innerHTML = '<div class="panel-message">Loading…</div>';
   updatePanelControls(panelState);
