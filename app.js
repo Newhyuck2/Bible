@@ -698,75 +698,104 @@ function addPanel() {
   }
 }
 
-function animatePanelReflow(previousRects) {
-  if (reducedMotion.matches) return;
-  for (const [panelId, oldRect] of previousRects) {
-    const panel = panelElements.get(panelId)?.panel;
-    if (!panel) continue;
-    const newRect = panel.getBoundingClientRect();
-    const deltaX = oldRect.left - newRect.left;
-    if (Math.abs(deltaX) < 1) continue;
-    panel.animate(
-      [
-        { transform: `translateX(${deltaX}px)` },
-        { transform: "translateX(0)" },
-      ],
-      { duration: 280, easing: "cubic-bezier(.2,.75,.25,1)" },
-    );
-  }
-}
-
-async function removePanel(id) {
+function removePanel(id) {
   if (state.panels.length === 1 || panelMutationInProgress) return;
   const index = state.panels.findIndex((panel) => panel.id === id);
   if (index < 0) return;
   panelMutationInProgress = true;
   const isLast = index === state.panels.length - 1;
-  const viewportStart = panelIndexAtViewportStart();
-  const loneLastPanelInLandscape = landscapeMobile.matches && isLast && viewportStart === index && index > 0;
+  const wasViewingRemoved = panelIndexAtViewportStart() === index;
   const removedPanel = panelElements.get(id)?.panel;
-  const previousRects = new Map(
-    state.panels
-      .filter((panelState) => panelState.id !== id)
-      .map((panelState) => [panelState.id, panelElements.get(panelState.id).panel.getBoundingClientRect()]),
-  );
-  const previousScrollLeft = panelTrack.scrollLeft;
+
+  state.panels.splice(index, 1);
+  panelElements.delete(id);
+  if (activePanelId === id) setActivePanel(state.panels[Math.min(index, state.panels.length - 1)].id);
+  saveState();
+  updatePanelNumbers();
+  updateRemoveButtons();
+
+  if (!removedPanel || reducedMotion.matches) {
+    removedPanel?.remove();
+    panelMutationInProgress = false;
+    return;
+  }
 
   try {
-    if (!isLast && removedPanel && !reducedMotion.matches) {
-      removedPanel.classList.add("panel-removing");
-      await removedPanel.animate(
-        [
-          { opacity: 1, transform: "scale(1)" },
-          { opacity: 0, transform: "scale(.96)" },
-        ],
-        { duration: 180, easing: "ease-in", fill: "forwards" },
-      ).finished;
-    }
+    removedPanel.style.pointerEvents = "none";
+    const collapse = () =>
+      collapsePanel(removedPanel, () => {
+        panelMutationInProgress = false;
+      });
 
-    state.panels.splice(index, 1);
-    removedPanel?.remove();
-    panelElements.delete(id);
-    panelTrack.scrollLeft = previousScrollLeft;
-    const nextActiveIndex = Math.min(index, state.panels.length - 1);
-    if (activePanelId === id) setActivePanel(state.panels[nextActiveIndex].id);
-    saveState();
-    updatePanelNumbers();
-    updateRemoveButtons();
-
-    if (!isLast) {
-      if (mobileLayout.matches) {
-        scrollToPanelIndex(Math.min(viewportStart, state.panels.length - 1), "auto", false);
-      }
-      animatePanelReflow(previousRects);
-    } else if (loneLastPanelInLandscape) {
-      requestAnimationFrame(() => scrollToPanelIndex(Math.max(0, state.panels.length - 2), "smooth", false));
-    } else if (mobileLayout.matches && !landscapeMobile.matches) {
-      requestAnimationFrame(() => scrollToPanelIndex(Math.max(0, state.panels.length - 1), "smooth", false));
+    if (isLast && mobileLayout.matches && wasViewingRemoved) {
+      // The rightmost panel fills the phone screen, so collapsing it in
+      // place would swap the view with no motion at all: glide to the
+      // neighbor first, then collapse the leaving panel off-screen.
+      // Mandatory snap would fight the glide, so disable it for the
+      // duration (collapsePanel's finish restores it).
+      panelTrack.classList.add("removing-panel");
+      const target = landscapeMobile.matches ? state.panels.length - 2 : state.panels.length - 1;
+      animateTrackScroll(panelScrollLeft(Math.max(0, target)), 320, collapse);
+    } else {
+      collapse();
     }
-  } finally {
+  } catch {
+    removedPanel.remove();
     panelMutationInProgress = false;
   }
+}
+
+// Native scrollTo({behavior: "smooth"}) is unreliable mid-removal — snap
+// containers can cut it short and some browsers finish it instantly — so
+// the glide is driven by hand, which also lets the collapse chain exactly
+// when the scroll lands.
+function animateTrackScroll(targetLeft, duration, done) {
+  const startLeft = panelTrack.scrollLeft;
+  const distance = targetLeft - startLeft;
+  if (!distance || reducedMotion.matches) {
+    panelTrack.scrollLeft = targetLeft;
+    done?.();
+    return;
+  }
+  const startTime = performance.now();
+  const easeOutCubic = (t) => 1 - (1 - t) ** 3;
+  const step = (now) => {
+    const progress = Math.min((now - startTime) / duration, 1);
+    panelTrack.scrollLeft = startLeft + distance * easeOutCubic(progress);
+    if (progress < 1) requestAnimationFrame(step);
+    else done?.();
+  };
+  requestAnimationFrame(step);
+}
+
+function collapsePanel(panel, done) {
+  const width = panel.getBoundingClientRect().width;
+  const gap = Number.parseFloat(getComputedStyle(panelTrack).columnGap) || 0;
+  // Inline styles with the "important" priority beat the mobile stylesheet's
+  // !important flex-basis, and pinning the start size in px keeps the
+  // shrink-to-zero transition animatable.
+  panel.style.setProperty("flex-basis", `${width}px`, "important");
+  panel.style.setProperty("width", `${width}px`, "important");
+  panel.style.setProperty("--removed-gap", `${gap}px`);
+  panel.style.setProperty("--removed-width", `${width}px`);
+  panelTrack.classList.add("removing-panel");
+  panel.getBoundingClientRect();
+  panel.classList.add("panel-removing");
+  panel.style.setProperty("flex-basis", "0px", "important");
+  panel.style.setProperty("width", "0px", "important");
+
+  let finished = false;
+  const finish = () => {
+    if (finished) return;
+    finished = true;
+    panel.remove();
+    if (!panelTrack.querySelector(".panel-removing")) panelTrack.classList.remove("removing-panel");
+    done?.();
+  };
+  panel.addEventListener("transitionend", (event) => {
+    if (event.target === panel && event.propertyName === "flex-basis") finish();
+  });
+  window.setTimeout(finish, 460);
 }
 
 function updatePanelNumbers() {

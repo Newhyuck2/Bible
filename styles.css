@@ -1139,6 +1139,35 @@ mark {
   user-select: none !important;
 }
 
+/* A removed panel collapses to zero width so its right-hand neighbors
+   glide over to fill the gap in one continuous motion; the negative margin
+   swallows the track gap the panel leaves behind. */
+.bible-panel.panel-removing {
+  z-index: 2;
+  min-width: 0 !important;
+  margin-inline-end: calc(var(--removed-gap, 0px) * -1);
+  overflow: hidden !important;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    flex-basis 300ms ease,
+    width 300ms ease,
+    margin-inline-end 300ms ease,
+    opacity 220ms ease;
+}
+
+/* Freeze the panel's contents at their pre-collapse width so text is
+   clipped from the right instead of reflowing while the panel shrinks. */
+.bible-panel.panel-removing > * {
+  width: var(--removed-width, auto);
+}
+
+/* Scroll snapping fights the shrinking layout mid-animation. */
+.panel-track.removing-panel {
+  scroll-snap-type: none;
+  scroll-behavior: auto;
+}
+
 .translation-chip.drag-over,
 .copy-translation-option.drag-over {
   outline: 2px solid var(--accent);
@@ -2456,11 +2485,6 @@ body * {
 
 .panel-track {
   overflow-anchor: none;
-}
-
-.bible-panel.panel-removing {
-  z-index: 2;
-  pointer-events: none;
 }
 
 @media (max-width: 820px), (max-height: 500px) and (pointer: coarse) {
