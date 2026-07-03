@@ -2546,3 +2546,161 @@ body * {
     cursor: grab;
   }
 }
+
+/* Translation order is changed by dragging the entire chip. */
+.translation-chip,
+.copy-translation-option {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.translation-chip:active,
+.copy-translation-option:active {
+  cursor: grabbing;
+}
+
+.drag-handle,
+.copy-drag-handle {
+  flex: 0 0 auto;
+  pointer-events: none;
+}
+
+.move-buttons,
+.copy-move-buttons {
+  display: none;
+}
+
+/* Panel numbers are identifiers only; movement controls live at the edges. */
+.panel-number,
+.panel-number.dragging {
+  border-color: var(--accent);
+  border-radius: 6px;
+  background: var(--accent);
+  color: white;
+  box-shadow: 0 3px 8px rgba(40, 79, 67, 0.2);
+  cursor: default;
+  touch-action: auto;
+}
+
+.panel-move {
+  display: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .panel-move {
+    position: absolute;
+    top: 50%;
+    z-index: 24;
+    display: grid;
+    width: 24px;
+    height: 72px;
+    padding: 0;
+    place-items: center;
+    transform: translateY(-50%);
+    border: 1px solid rgba(40, 79, 67, 0.2);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.68);
+    box-shadow: 0 4px 12px rgba(37, 35, 31, 0.08);
+    opacity: 0;
+    backdrop-filter: blur(3px);
+    transition: opacity 130ms ease, background-color 130ms ease;
+  }
+
+  .panel-move-left {
+    left: 4px;
+  }
+
+  .panel-move-right {
+    right: 4px;
+  }
+
+  .panel-move:hover:not(:disabled),
+  .panel-move:focus-visible {
+    background: rgba(255, 255, 255, 0.92);
+    opacity: 1;
+  }
+
+  .panel-move:disabled {
+    display: none;
+  }
+
+  .panel-move span {
+    width: 0;
+    height: 0;
+    border-top: 8px solid transparent;
+    border-bottom: 8px solid transparent;
+  }
+
+  .panel-move-left span {
+    border-right: 7px solid var(--accent);
+  }
+
+  .panel-move-right span {
+    border-left: 7px solid var(--accent);
+  }
+}
+
+/* Contextual verse-selection actions. */
+.copy-selection {
+  left: calc(50% - 21px);
+}
+
+.cancel-selection {
+  position: absolute;
+  bottom: 10px;
+  left: calc(50% + 21px);
+  z-index: 8;
+  display: grid;
+  width: 36px;
+  height: 34px;
+  padding: 0;
+  place-items: center;
+  transform: translateX(-50%);
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: white;
+  color: var(--ink);
+  font-size: 22px;
+  line-height: 1;
+  box-shadow: 0 5px 14px rgba(37, 35, 31, 0.14);
+}
+
+.cancel-selection:hover {
+  border-color: #9d968b;
+  background: #f8f6f1;
+}
+
+.panel-track.panel-reorder-active {
+  overflow-x: hidden;
+  scroll-snap-type: none;
+}
+
+.bible-panel.panel-longpress-dragging {
+  z-index: 7;
+  opacity: 0.94;
+  box-shadow: 0 18px 38px rgba(37, 35, 31, 0.22);
+  touch-action: none;
+  user-select: none;
+  will-change: transform;
+}
+
+@media (max-width: 820px), (max-height: 500px) and (pointer: coarse) {
+  .copy-selection {
+    left: calc(50% - 25px);
+  }
+
+  .cancel-selection {
+    bottom: 12px;
+    left: calc(50% + 25px);
+    width: 44px;
+    height: 44px;
+    font-size: 25px;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 500px) and (pointer: coarse) {
+  .panel-number {
+    cursor: default;
+  }
+}

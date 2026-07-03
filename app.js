@@ -134,7 +134,7 @@ function translationLanguage(id) {
 function renderTranslationControls() {
   translationList.replaceChildren();
 
-  state.translationOrder.forEach((id, index) => {
+  state.translationOrder.forEach((id) => {
     const meta = translationMeta(id);
     const isEnabled = state.enabledTranslations.includes(id);
     const chip = document.createElement("div");
@@ -154,7 +154,6 @@ function renderTranslationControls() {
     handle.setAttribute("aria-hidden", "true");
     setupTouchReorder({
       item: chip,
-      handle,
       container: translationList,
       itemClass: "translation-chip",
       id,
@@ -181,24 +180,6 @@ function renderTranslationControls() {
     name.textContent = meta.label;
     name.style.setProperty("--translation-color", TRANSLATION_COLORS[id]);
 
-    const moveButtons = document.createElement("span");
-    moveButtons.className = "move-buttons";
-    const left = document.createElement("button");
-    left.className = "move-translation";
-    left.type = "button";
-    left.textContent = "‹";
-    left.disabled = index === 0;
-    left.setAttribute("aria-label", `Move ${meta.label} left`);
-    left.addEventListener("click", () => moveTranslation(index, index - 1));
-    const right = document.createElement("button");
-    right.className = "move-translation";
-    right.type = "button";
-    right.textContent = "›";
-    right.disabled = index === state.translationOrder.length - 1;
-    right.setAttribute("aria-label", `Move ${meta.label} right`);
-    right.addEventListener("click", () => moveTranslation(index, index + 1));
-    moveButtons.append(left, right);
-
     chip.addEventListener("dragstart", (event) => {
       chip.classList.add("dragging");
       event.dataTransfer.setData("text/plain", id);
@@ -214,7 +195,6 @@ function renderTranslationControls() {
       if (from >= 0 && to >= 0 && from !== to) moveTranslation(from, to);
     });
     chip.addEventListener("click", (event) => {
-      if (event.target.closest("button, .drag-handle")) return;
       toggleTranslation();
     });
     chip.addEventListener("keydown", (event) => {
@@ -224,7 +204,7 @@ function renderTranslationControls() {
       toggleTranslation();
     });
 
-    chip.append(handle, name, moveButtons);
+    chip.append(handle, name);
     translationList.append(chip);
   });
 }
@@ -243,27 +223,41 @@ function moveTranslation(from, to) {
 // item is lifted with a transform, elementFromPoint finds the item underneath
 // the finger, and the swap only happens once on release (mirroring the mouse
 // drop handler above).
-function setupTouchReorder({ item, handle, container, itemClass, id, getOrder, onReorder }) {
-  handle.addEventListener("pointerdown", (event) => {
-    if (event.pointerType !== "touch") return;
+function setupTouchReorder({ item, container, itemClass, id, getOrder, onReorder }) {
+  let suppressClick = false;
+
+  item.addEventListener("click", (event) => {
+    if (!suppressClick) return;
     event.preventDefault();
-    event.stopPropagation();
+    event.stopImmediatePropagation();
+    suppressClick = false;
+  }, true);
+
+  item.addEventListener("pointerdown", (event) => {
+    if (event.pointerType !== "touch") return;
     const pointerId = event.pointerId;
     const startX = event.clientX;
     const startY = event.clientY;
     let hoverTarget = null;
+    let dragging = false;
 
-    handle.setPointerCapture(pointerId);
-    item.classList.add("dragging");
-    item.style.position = "relative";
-    item.style.zIndex = "5";
-    item.style.pointerEvents = "none";
-    document.body.classList.add("reordering-chip");
+    item.setPointerCapture(pointerId);
 
     const move = (moveEvent) => {
       if (moveEvent.pointerId !== pointerId) return;
       const dx = moveEvent.clientX - startX;
       const dy = moveEvent.clientY - startY;
+      if (!dragging && Math.hypot(dx, dy) < 6) return;
+      if (!dragging) {
+        dragging = true;
+        item.classList.add("dragging");
+        item.style.position = "relative";
+        item.style.zIndex = "5";
+        item.style.pointerEvents = "none";
+        document.body.classList.add("reordering-chip");
+      }
+      moveEvent.preventDefault();
+      moveEvent.stopPropagation();
       item.style.transform = `translate(${dx}px, ${dy}px)`;
       const target = document
         .elementFromPoint(moveEvent.clientX, moveEvent.clientY)
@@ -274,11 +268,12 @@ function setupTouchReorder({ item, handle, container, itemClass, id, getOrder, o
       hoverTarget?.classList.add("drag-over");
     };
 
-    const finish = () => {
-      handle.releasePointerCapture(pointerId);
-      handle.removeEventListener("pointermove", move);
-      handle.removeEventListener("pointerup", finish);
-      handle.removeEventListener("pointercancel", finish);
+    const finish = (finishEvent) => {
+      if (finishEvent.pointerId !== pointerId) return;
+      if (item.hasPointerCapture(pointerId)) item.releasePointerCapture(pointerId);
+      item.removeEventListener("pointermove", move);
+      item.removeEventListener("pointerup", finish);
+      item.removeEventListener("pointercancel", finish);
       item.classList.remove("dragging");
       item.style.position = "";
       item.style.zIndex = "";
@@ -286,7 +281,14 @@ function setupTouchReorder({ item, handle, container, itemClass, id, getOrder, o
       item.style.transform = "";
       document.body.classList.remove("reordering-chip");
       hoverTarget?.classList.remove("drag-over");
-      if (hoverTarget) {
+      if (dragging) {
+        finishEvent.preventDefault();
+        suppressClick = true;
+        window.setTimeout(() => {
+          suppressClick = false;
+        }, 350);
+      }
+      if (dragging && hoverTarget) {
         const order = getOrder();
         const from = order.indexOf(id);
         const to = order.indexOf(hoverTarget.dataset.translation);
@@ -294,9 +296,9 @@ function setupTouchReorder({ item, handle, container, itemClass, id, getOrder, o
       }
     };
 
-    handle.addEventListener("pointermove", move);
-    handle.addEventListener("pointerup", finish);
-    handle.addEventListener("pointercancel", finish);
+    item.addEventListener("pointermove", move, { passive: false });
+    item.addEventListener("pointerup", finish);
+    item.addEventListener("pointercancel", finish);
   });
 }
 
@@ -600,8 +602,11 @@ function createPanelElement(panelState, shouldScroll = false) {
   const chapterInput = fragment.querySelector(".chapter-input");
   const content = fragment.querySelector(".panel-content");
   const copy = fragment.querySelector(".copy-selection");
+  const cancelSelection = fragment.querySelector(".cancel-selection");
   const remove = fragment.querySelector(".remove-panel");
   const panelNumber = fragment.querySelector(".panel-number");
+  const moveLeft = fragment.querySelector(".panel-move-left");
+  const moveRight = fragment.querySelector(".panel-move-right");
   const previous = fragment.querySelector(".previous-chapter");
   const next = fragment.querySelector(".next-chapter");
   const resizeHandle = fragment.querySelector(".panel-resize-handle");
@@ -650,16 +655,39 @@ function createPanelElement(panelState, shouldScroll = false) {
     },
   });
   copy.addEventListener("click", () => openCopyDialog(panelState));
+  cancelSelection.addEventListener("click", () => clearPanelSelection(panelState));
   remove.addEventListener("click", () => removePanel(id));
+  moveLeft.addEventListener("click", (event) => {
+    event.stopPropagation();
+    movePanelBy(panelState, -1);
+  });
+  moveRight.addEventListener("click", (event) => {
+    event.stopPropagation();
+    movePanelBy(panelState, 1);
+  });
   previous.addEventListener("click", () => navigateChapter(panelState, -1));
   next.addEventListener("click", () => navigateChapter(panelState, 1));
   setupPanelResize(panel, resizeHandle, panelState);
   setupPanelSwipe(panel, content);
-  setupPanelDrag(panel, panelNumber, panelState);
+  setupLandscapePanelLongPress(panel, panelState);
 
-  panelElements.set(id, { panel, bookCombo, chapterCombo, content, copy, remove, panelNumber, previous, next });
+  panelElements.set(id, {
+    panel,
+    bookCombo,
+    chapterCombo,
+    content,
+    copy,
+    cancelSelection,
+    remove,
+    panelNumber,
+    moveLeft,
+    moveRight,
+    previous,
+    next,
+  });
   panelTrack.append(fragment);
   updatePanelNumbers();
+  updatePanelMoveButtons();
   updateRemoveButtons();
   setActivePanel(id);
   loadPanel(panelState);
@@ -714,6 +742,7 @@ function removePanel(id) {
   saveState();
   updatePanelNumbers();
   updateRemoveButtons();
+  updatePanelMoveButtons();
 
   if (!removedPanel || reducedMotion.matches) {
     removedPanel?.remove();
@@ -814,6 +843,7 @@ function movePanel(from, to) {
   panelTrack.insertBefore(movedPanel, nextState ? panelElements.get(nextState.id).panel : null);
   saveState();
   updatePanelNumbers();
+  updatePanelMoveButtons();
   if (reducedMotion.matches) return;
   for (const [panelId, oldLeft] of previousLefts) {
     const panel = panelElements.get(panelId)?.panel;
@@ -827,76 +857,104 @@ function movePanel(from, to) {
   }
 }
 
-// Dragging a panel's number badge moves the whole panel: anywhere in the
-// row on desktop, but in landscape mobile only a swap with the other panel
-// of the visible pair. Portrait mobile shows one panel per screen, so
-// badge-drag reordering is disabled there.
-function setupPanelDrag(panel, badge, panelState) {
-  badge.addEventListener("pointerdown", (event) => {
-    if (event.pointerType === "mouse" && event.button !== 0) return;
-    if (mobileLayout.matches && !landscapeMobile.matches) return;
+// On a landscape phone, holding anywhere on the reading surface lifts the
+// panel. Dragging it toward an adjacent panel swaps the two on release.
+function setupLandscapePanelLongPress(panel, panelState) {
+  let gesture = null;
+  let suppressClickUntil = 0;
+
+  panel.addEventListener("click", (event) => {
+    if (Date.now() >= suppressClickUntil) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }, true);
+
+  panel.addEventListener("pointerdown", (event) => {
+    if (event.pointerType !== "touch" || !landscapeMobile.matches) return;
     if (panelMutationInProgress || state.panels.length < 2) return;
+    if (event.target.closest("button, input, .combo-menu, .panel-resize-handle")) return;
+
+    const pointerId = event.pointerId;
+    gesture = {
+      pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      active: false,
+      targetIndex: -1,
+      timer: window.setTimeout(() => {
+        if (!gesture || gesture.pointerId !== pointerId) return;
+        gesture.active = true;
+        setActivePanel(panelState.id);
+        panel.setPointerCapture(pointerId);
+        panel.classList.add("panel-longpress-dragging");
+        panel.style.transform = "scale(0.97)";
+        panelTrack.classList.add("panel-reorder-active");
+        document.body.classList.add("reordering-chip");
+      }, 430),
+    };
+  });
+
+  panel.addEventListener("pointermove", (event) => {
+    if (!gesture || event.pointerId !== gesture.pointerId) return;
+    const dx = event.clientX - gesture.startX;
+    const dy = event.clientY - gesture.startY;
+    if (!gesture.active) {
+      if (Math.hypot(dx, dy) >= 9) {
+        window.clearTimeout(gesture.timer);
+        gesture = null;
+      }
+      return;
+    }
+
     event.preventDefault();
     event.stopPropagation();
-    setActivePanel(panelState.id);
-    const pointerId = event.pointerId;
-    const startX = event.clientX;
-    const landscapePair = landscapeMobile.matches ? panelIndexAtViewportStart() : null;
-    let hoverTarget = null;
+    panel.style.transform = `translateX(${dx}px) scale(0.97)`;
+    const from = state.panels.findIndex((item) => item.id === panelState.id);
+    const direction = Math.abs(dx) >= 34 ? Math.sign(dx) : 0;
+    const targetIndex = direction ? from + direction : -1;
+    const validTarget = targetIndex >= 0 && targetIndex < state.panels.length ? targetIndex : -1;
+    if (validTarget === gesture.targetIndex) return;
+    if (gesture.targetIndex >= 0) {
+      panelElements.get(state.panels[gesture.targetIndex]?.id)?.panel.classList.remove("drop-target");
+    }
+    gesture.targetIndex = validTarget;
+    if (validTarget >= 0) panelElements.get(state.panels[validTarget].id)?.panel.classList.add("drop-target");
+  }, { passive: false });
 
-    badge.setPointerCapture(pointerId);
-    badge.classList.add("dragging");
-    panel.classList.add("panel-dragging");
-    panel.style.pointerEvents = "none";
-    document.body.classList.add("reordering-chip");
-    // Mandatory snap re-snaps toward the dragged panel's transformed
-    // position, scrolling the track out from under the pointer.
-    panelTrack.classList.add("removing-panel");
+  const finish = (event) => {
+    if (!gesture || event.pointerId !== gesture.pointerId) return;
+    window.clearTimeout(gesture.timer);
+    const { active, targetIndex } = gesture;
+    gesture = null;
+    if (!active) return;
 
-    const allowedTarget = (candidate) => {
-      if (!candidate || candidate === panel || candidate.parentElement !== panelTrack) return null;
-      if (landscapePair === null) return candidate;
-      const myIndex = state.panels.findIndex((item) => item.id === panelState.id);
-      const candidateIndex = state.panels.findIndex((item) => item.id === candidate.dataset.panelId);
-      const neighbor = myIndex === landscapePair ? landscapePair + 1 : landscapePair;
-      return candidateIndex === neighbor ? candidate : null;
-    };
+    event.preventDefault();
+    event.stopPropagation();
+    if (panel.hasPointerCapture(event.pointerId)) panel.releasePointerCapture(event.pointerId);
+    panel.classList.remove("panel-longpress-dragging");
+    panel.style.transform = "";
+    panelTrack.classList.remove("panel-reorder-active");
+    document.body.classList.remove("reordering-chip");
+    for (const { panel: candidate } of panelElements.values()) candidate.classList.remove("drop-target");
+    suppressClickUntil = Date.now() + 450;
+    if (targetIndex >= 0) {
+      const from = state.panels.findIndex((item) => item.id === panelState.id);
+      movePanel(from, targetIndex);
+      scrollToPanelIndex(Math.min(from, targetIndex), "smooth", false);
+    }
+  };
 
-    const move = (moveEvent) => {
-      if (moveEvent.pointerId !== pointerId) return;
-      panel.style.transform = `translateX(${moveEvent.clientX - startX}px)`;
-      const under = document
-        .elementFromPoint(moveEvent.clientX, moveEvent.clientY)
-        ?.closest(".bible-panel");
-      const next = allowedTarget(under);
-      if (hoverTarget && hoverTarget !== next) hoverTarget.classList.remove("drop-target");
-      hoverTarget = next;
-      hoverTarget?.classList.add("drop-target");
-    };
-
-    const finish = () => {
-      badge.releasePointerCapture(pointerId);
-      badge.removeEventListener("pointermove", move);
-      badge.removeEventListener("pointerup", finish);
-      badge.removeEventListener("pointercancel", finish);
-      badge.classList.remove("dragging");
-      panel.classList.remove("panel-dragging");
-      panel.style.transform = "";
-      panel.style.pointerEvents = "";
-      document.body.classList.remove("reordering-chip");
-      if (!panelTrack.querySelector(".panel-removing")) panelTrack.classList.remove("removing-panel");
-      hoverTarget?.classList.remove("drop-target");
-      if (hoverTarget) {
-        const from = state.panels.findIndex((item) => item.id === panelState.id);
-        const to = state.panels.findIndex((item) => item.id === hoverTarget.dataset.panelId);
-        if (from >= 0 && to >= 0 && from !== to) movePanel(from, to);
-      }
-    };
-
-    badge.addEventListener("pointermove", move);
-    badge.addEventListener("pointerup", finish);
-    badge.addEventListener("pointercancel", finish);
+  panel.addEventListener("pointerup", finish);
+  panel.addEventListener("pointercancel", finish);
+  panel.addEventListener("contextmenu", (event) => {
+    if (panel.classList.contains("panel-longpress-dragging")) event.preventDefault();
   });
+}
+
+function movePanelBy(panelState, direction) {
+  if (panelMutationInProgress) return;
+  const from = state.panels.findIndex((item) => item.id === panelState.id);
+  movePanel(from, from + direction);
 }
 
 function updatePanelNumbers() {
@@ -907,6 +965,15 @@ function updatePanelNumbers() {
     panelNumber.textContent = number;
     panelNumber.setAttribute("aria-label", `Panel ${number}`);
     panelNumber.title = `Panel ${number}`;
+  });
+}
+
+function updatePanelMoveButtons() {
+  state.panels.forEach((panelState, index) => {
+    const elements = panelElements.get(panelState.id);
+    if (!elements) return;
+    elements.moveLeft.disabled = index === 0;
+    elements.moveRight.disabled = index === state.panels.length - 1;
   });
 }
 
@@ -949,6 +1016,7 @@ function updatePanelSelection(panelState) {
     group.classList.toggle("selected", Boolean(bounds && verse >= bounds[0] && verse <= bounds[1]));
   });
   elements.copy.hidden = !bounds;
+  elements.cancelSelection.hidden = !bounds;
 }
 
 function clearPanelSelection(panelState) {
@@ -1105,7 +1173,7 @@ function renderCopyTranslationOptions(checkedTranslations = null) {
   );
   copyTranslations.replaceChildren();
 
-  copyTranslationOrder.forEach((translation, index) => {
+  copyTranslationOrder.forEach((translation) => {
     const item = document.createElement("div");
     item.className = "copy-translation-option";
     item.classList.toggle("selected", checked.has(translation));
@@ -1122,7 +1190,6 @@ function renderCopyTranslationOptions(checkedTranslations = null) {
     handle.title = "Drag to reorder";
     setupTouchReorder({
       item,
-      handle,
       container: copyTranslations,
       itemClass: "copy-translation-option",
       id: translation,
@@ -1135,22 +1202,6 @@ function renderCopyTranslationOptions(checkedTranslations = null) {
     text.lang = translationLanguage(translation);
     text.textContent = translationMeta(translation).label;
     text.style.setProperty("--translation-color", TRANSLATION_COLORS[translation]);
-
-    const moves = document.createElement("span");
-    moves.className = "copy-move-buttons";
-    const left = document.createElement("button");
-    left.type = "button";
-    left.textContent = "‹";
-    left.disabled = index === 0;
-    left.setAttribute("aria-label", `Move ${translationMeta(translation).label} left`);
-    left.addEventListener("click", () => moveCopyTranslation(index, index - 1));
-    const right = document.createElement("button");
-    right.type = "button";
-    right.textContent = "›";
-    right.disabled = index === copyTranslationOrder.length - 1;
-    right.setAttribute("aria-label", `Move ${translationMeta(translation).label} right`);
-    right.addEventListener("click", () => moveCopyTranslation(index, index + 1));
-    moves.append(left, right);
 
     item.addEventListener("dragstart", (event) => {
       item.classList.add("dragging");
@@ -1172,7 +1223,6 @@ function renderCopyTranslationOptions(checkedTranslations = null) {
       item.setAttribute("aria-checked", String(selected));
     };
     item.addEventListener("click", (event) => {
-      if (event.target.closest("button, .copy-drag-handle")) return;
       toggleCopyTranslation();
     });
     item.addEventListener("keydown", (event) => {
@@ -1182,7 +1232,7 @@ function renderCopyTranslationOptions(checkedTranslations = null) {
       toggleCopyTranslation();
     });
 
-    item.append(handle, text, moves);
+    item.append(handle, text);
     copyTranslations.append(item);
   });
 }
