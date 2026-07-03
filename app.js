@@ -6,6 +6,7 @@ const TRANSLATION_COLORS = {
   SAENEW: "#805692",
   WLB: "#a24f62",
 };
+const ASSET_VERSION = "20260703-2";
 const MOBILE_LAYOUT_QUERY = "(max-width: 820px), (max-height: 500px) and (pointer: coarse)";
 const mobileLayout = window.matchMedia(MOBILE_LAYOUT_QUERY);
 
@@ -41,7 +42,7 @@ let copyPanelState = null;
 let copyTranslationOrder = [];
 const chapterCache = new Map();
 const panelElements = new Map();
-const searchWorker = new Worker("./search-worker.js");
+const searchWorker = new Worker(`./search-worker.js?v=${ASSET_VERSION}`);
 
 function freshState() {
   return {
@@ -573,13 +574,13 @@ function updateRemoveButtons() {
 }
 
 function chapterPath(bookIndex, chapter) {
-  return `./data/chapters/${manifest.books[bookIndex].slug}/${chapter}.json`;
+  return `./data/chapters/${manifest.books[bookIndex].slug}/${chapter}.json?v=${ASSET_VERSION}`;
 }
 
 async function getChapter(bookIndex, chapter) {
   const key = `${bookIndex}:${chapter}`;
   if (chapterCache.has(key)) return chapterCache.get(key);
-  const response = await fetch(chapterPath(bookIndex, chapter));
+  const response = await fetch(chapterPath(bookIndex, chapter), { cache: "no-store" });
   if (!response.ok) throw new Error(`Could not load this chapter (${response.status})`);
   const data = await response.json();
   chapterCache.set(key, data);
@@ -1105,7 +1106,7 @@ function escapeHtml(value) {
 
 async function init() {
   try {
-    const response = await fetch("./data/manifest.json");
+    const response = await fetch(`./data/manifest.json?v=${ASSET_VERSION}`, { cache: "no-store" });
     if (!response.ok) throw new Error(`Could not load site data (${response.status})`);
     manifest = await response.json();
     state = loadState();

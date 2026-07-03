@@ -1,9 +1,10 @@
 const cache = new Map();
 const MAX_MATCHES_PER_TRANSLATION_PER_BOOK = 25;
+const ASSET_VERSION = "20260703-2";
 
 async function loadTranslation(translation) {
   if (cache.has(translation)) return cache.get(translation);
-  const response = await fetch(`./data/search/${translation}.json`);
+  const response = await fetch(`./data/search/${translation}.json?v=${ASSET_VERSION}`, { cache: "no-store" });
   if (!response.ok) throw new Error(`Could not load ${translation} search data (${response.status})`);
   const data = await response.json();
   cache.set(translation, data);
