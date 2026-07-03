@@ -570,6 +570,7 @@ function createPanelElement(panelState, shouldScroll = false) {
   const content = fragment.querySelector(".panel-content");
   const copy = fragment.querySelector(".copy-selection");
   const remove = fragment.querySelector(".remove-panel");
+  const panelNumber = fragment.querySelector(".panel-number");
   const previous = fragment.querySelector(".previous-chapter");
   const next = fragment.querySelector(".next-chapter");
   const resizeHandle = fragment.querySelector(".panel-resize-handle");
@@ -624,8 +625,9 @@ function createPanelElement(panelState, shouldScroll = false) {
   setupPanelResize(panel, resizeHandle, panelState);
   setupPanelSwipe(panel, content, panelState);
 
-  panelElements.set(id, { panel, bookCombo, chapterCombo, content, copy, remove, previous, next });
+  panelElements.set(id, { panel, bookCombo, chapterCombo, content, copy, remove, panelNumber, previous, next });
   panelTrack.append(fragment);
+  updatePanelNumbers();
   updateRemoveButtons();
   setActivePanel(id);
   loadPanel(panelState);
@@ -659,7 +661,19 @@ function removePanel(id) {
   panelElements.delete(id);
   if (activePanelId === id) setActivePanel(state.panels[Math.max(0, index - 1)].id);
   saveState();
+  updatePanelNumbers();
   updateRemoveButtons();
+}
+
+function updatePanelNumbers() {
+  state.panels.forEach((panelState, index) => {
+    const panelNumber = panelElements.get(panelState.id)?.panelNumber;
+    if (!panelNumber) return;
+    const number = index + 1;
+    panelNumber.textContent = number;
+    panelNumber.setAttribute("aria-label", `Panel ${number}`);
+    panelNumber.title = `Panel ${number}`;
+  });
 }
 
 function updateRemoveButtons() {
