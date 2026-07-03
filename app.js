@@ -892,7 +892,7 @@ function buildCopyText(panelState, translations, order) {
     for (const [verse, texts] of verses) {
       lines.push(`${bookName} ${panelState.chapter}:${verse}, ${translationNames}`);
       for (const translation of translations) {
-        if (texts[translation]) lines.push(`${verse} ${translationMeta(translation).label} — ${texts[translation]}`);
+        if (texts[translation]) lines.push(`${verse} ${texts[translation]}`);
       }
       lines.push("");
     }
