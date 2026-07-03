@@ -2615,6 +2615,7 @@ body * {
     right: 4px;
   }
 
+  .panel-move.revealed:not(:disabled),
   .panel-move:hover:not(:disabled),
   .panel-move:focus-visible {
     background: rgba(255, 255, 255, 0.92);

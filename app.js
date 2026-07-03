@@ -593,6 +593,22 @@ function setupPanelResize(panel, handle, panelState) {
   });
 }
 
+function setupPanelMoveReveal(panel, moveLeft, moveRight) {
+  const clear = () => {
+    moveLeft.classList.remove("revealed");
+    moveRight.classList.remove("revealed");
+  };
+
+  panel.addEventListener("pointermove", (event) => {
+    if (event.pointerType !== "mouse") return;
+    const rect = panel.getBoundingClientRect();
+    const nearMiddle = Math.abs(event.clientY - (rect.top + rect.height / 2)) <= 82;
+    moveLeft.classList.toggle("revealed", nearMiddle && event.clientX - rect.left <= 64);
+    moveRight.classList.toggle("revealed", nearMiddle && rect.right - event.clientX <= 64);
+  });
+  panel.addEventListener("pointerleave", clear);
+}
+
 function createPanelElement(panelState, shouldScroll = false) {
   const id = `panel-${++panelIdCounter}`;
   panelState.id = id;
@@ -668,6 +684,7 @@ function createPanelElement(panelState, shouldScroll = false) {
   previous.addEventListener("click", () => navigateChapter(panelState, -1));
   next.addEventListener("click", () => navigateChapter(panelState, 1));
   setupPanelResize(panel, resizeHandle, panelState);
+  setupPanelMoveReveal(panel, moveLeft, moveRight);
   setupPanelSwipe(panel, content);
   setupLandscapePanelLongPress(panel, panelState);
 
@@ -858,7 +875,7 @@ function movePanel(from, to) {
 }
 
 // On a landscape phone, holding anywhere on the reading surface lifts the
-// panel. Dragging it toward an adjacent panel swaps the two on release.
+// panel. Only the two panels currently visible can swap with each other.
 function setupLandscapePanelLongPress(panel, panelState) {
   let gesture = null;
   let suppressClickUntil = 0;
@@ -875,10 +892,12 @@ function setupLandscapePanelLongPress(panel, panelState) {
     if (event.target.closest("button, input, .combo-menu, .panel-resize-handle")) return;
 
     const pointerId = event.pointerId;
+    const pairStart = Math.min(panelIndexAtViewportStart(), Math.max(0, state.panels.length - 2));
     gesture = {
       pointerId,
       startX: event.clientX,
       startY: event.clientY,
+      pairStart,
       active: false,
       targetIndex: -1,
       timer: window.setTimeout(() => {
@@ -910,9 +929,16 @@ function setupLandscapePanelLongPress(panel, panelState) {
     event.stopPropagation();
     panel.style.transform = `translateX(${dx}px) scale(0.97)`;
     const from = state.panels.findIndex((item) => item.id === panelState.id);
-    const direction = Math.abs(dx) >= 34 ? Math.sign(dx) : 0;
-    const targetIndex = direction ? from + direction : -1;
-    const validTarget = targetIndex >= 0 && targetIndex < state.panels.length ? targetIndex : -1;
+    const pairEnd = gesture.pairStart + 1;
+    const otherVisibleIndex = from === gesture.pairStart
+      ? pairEnd
+      : from === pairEnd
+        ? gesture.pairStart
+        : -1;
+    const requiredDirection = Math.sign(otherVisibleIndex - from);
+    const validTarget = Math.abs(dx) >= 34 && Math.sign(dx) === requiredDirection
+      ? otherVisibleIndex
+      : -1;
     if (validTarget === gesture.targetIndex) return;
     if (gesture.targetIndex >= 0) {
       panelElements.get(state.panels[gesture.targetIndex]?.id)?.panel.classList.remove("drop-target");
@@ -924,7 +950,7 @@ function setupLandscapePanelLongPress(panel, panelState) {
   const finish = (event) => {
     if (!gesture || event.pointerId !== gesture.pointerId) return;
     window.clearTimeout(gesture.timer);
-    const { active, targetIndex } = gesture;
+    const { active, targetIndex, pairStart } = gesture;
     gesture = null;
     if (!active) return;
 
@@ -933,14 +959,19 @@ function setupLandscapePanelLongPress(panel, panelState) {
     if (panel.hasPointerCapture(event.pointerId)) panel.releasePointerCapture(event.pointerId);
     panel.classList.remove("panel-longpress-dragging");
     panel.style.transform = "";
-    panelTrack.classList.remove("panel-reorder-active");
     document.body.classList.remove("reordering-chip");
     for (const { panel: candidate } of panelElements.values()) candidate.classList.remove("drop-target");
     suppressClickUntil = Date.now() + 450;
     if (targetIndex >= 0) {
       const from = state.panels.findIndex((item) => item.id === panelState.id);
       movePanel(from, targetIndex);
-      scrollToPanelIndex(Math.min(from, targetIndex), "smooth", false);
+      panelTrack.scrollLeft = panelScrollLeft(pairStart);
+      requestAnimationFrame(() => {
+        panelTrack.scrollLeft = panelScrollLeft(pairStart);
+        panelTrack.classList.remove("panel-reorder-active");
+      });
+    } else {
+      panelTrack.classList.remove("panel-reorder-active");
     }
   };
 
