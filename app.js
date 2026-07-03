@@ -566,47 +566,6 @@ function setupPanelSwipe(panel, content) {
   content.addEventListener("touchcancel", (event) => finish(event, true));
 }
 
-function setupPanelHeaderAutoHide(panel, content) {
-  let lastScrollTop = content.scrollTop;
-  let direction = 0;
-  let distance = 0;
-  let scheduled = false;
-
-  content.addEventListener("scroll", () => {
-    if (scheduled) return;
-    scheduled = true;
-    requestAnimationFrame(() => {
-      scheduled = false;
-      const currentScrollTop = Math.max(0, content.scrollTop);
-      const delta = currentScrollTop - lastScrollTop;
-      lastScrollTop = currentScrollTop;
-
-      if (currentScrollTop <= 8) {
-        panel.classList.remove("panel-header-hidden");
-        direction = 0;
-        distance = 0;
-        return;
-      }
-      if (Math.abs(delta) < 0.5) return;
-
-      const nextDirection = delta > 0 ? 1 : -1;
-      if (nextDirection !== direction) {
-        direction = nextDirection;
-        distance = 0;
-      }
-      distance += Math.abs(delta);
-
-      if (direction > 0 && distance >= 18) {
-        panel.classList.add("panel-header-hidden");
-        distance = 0;
-      } else if (direction < 0 && distance >= 7) {
-        panel.classList.remove("panel-header-hidden");
-        distance = 0;
-      }
-    });
-  }, { passive: true });
-}
-
 function chapterItems(bookIndex) {
   return Array.from({ length: manifest.books[bookIndex].chapters }, (_, index) => ({
     value: index + 1,
@@ -743,7 +702,6 @@ function createPanelElement(panelState, shouldScroll = false) {
   setupPanelResize(panel, resizeHandle, panelState);
   setupPanelMoveReveal(panel, moveLeft, moveRight);
   setupPanelSwipe(panel, content);
-  setupPanelHeaderAutoHide(panel, content);
   setupLandscapePanelLongPress(panel, panelState);
 
   panelElements.set(id, {
@@ -1121,7 +1079,6 @@ function updatePanelSelection(panelState) {
   });
   elements.copy.hidden = !bounds;
   elements.cancelSelection.hidden = !bounds;
-  if (bounds) elements.panel.classList.remove("panel-header-hidden");
 }
 
 function clearPanelSelection(panelState) {
@@ -1154,7 +1111,6 @@ async function loadPanel(panelState, targetVerse = null) {
   if (!elements) return;
   const requestKey = `${panelState.book}:${panelState.chapter}:${Date.now()}`;
   elements.panel.dataset.requestKey = requestKey;
-  elements.panel.classList.remove("panel-header-hidden");
   clearPanelSelection(panelState);
   elements.content.innerHTML = '<div class="panel-message">Loading…</div>';
   updatePanelControls(panelState);

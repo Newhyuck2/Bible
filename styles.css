@@ -2727,29 +2727,6 @@ body * {
   }
 }
 
-/* The panel controls collapse into the top edge while reading. */
-.panel-header {
-  max-height: 72px;
-  transform: translateY(0);
-  opacity: 1;
-  transition:
-    max-height 190ms ease,
-    padding 190ms ease,
-    border-color 190ms ease,
-    transform 190ms ease,
-    opacity 140ms ease;
-}
-
-.bible-panel.panel-header-hidden .panel-header {
-  max-height: 0;
-  padding-top: 0;
-  padding-bottom: 0;
-  border-bottom-color: transparent;
-  transform: translateY(calc(-100% - 2px));
-  opacity: 0;
-  pointer-events: none;
-}
-
 /* Phones in landscape and tablets in either orientation use one top row. */
 @media (orientation: landscape) and (pointer: coarse),
   (min-width: 600px) and (pointer: coarse) {
