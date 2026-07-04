@@ -258,7 +258,7 @@ p {
   height: 100%;
   gap: 16px;
   overflow-x: auto;
-  padding: 0 max(24px, calc((100vw - 1800px) / 2));
+  padding: 0 24px;
   scroll-behavior: smooth;
   scroll-snap-type: x proximity;
   scrollbar-color: #b9b0a1 transparent;
@@ -1349,12 +1349,10 @@ mark {
 .compact-toolbar {
   display: flex;
   width: 100%;
-  max-width: 1800px;
   height: 100%;
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  margin: 0 auto;
 }
 
 .compact-toolbar .translation-list {
@@ -1373,7 +1371,7 @@ mark {
 
 .panel-track {
   gap: 10px;
-  padding-inline: max(12px, calc((100vw - 1800px) / 2));
+  padding-inline: 12px;
 }
 
 .bible-panel {

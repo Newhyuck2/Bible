@@ -184,10 +184,13 @@ function updatePanelCountControls() {
   panelCountTwoButton.setAttribute("aria-pressed", String(twoSelected));
 }
 
+// The two-panel width is shaved a little below half the track so two panels
+// plus the gap always fit inside one screen without a horizontal scrollbar.
 function desktopPanelModeWidth(mode) {
   const gap = Number.parseFloat(getComputedStyle(panelTrack).columnGap) || 0;
   const available = maximumPanelWidth();
-  return Math.max(320, Math.round(mode === 2 ? (available - gap) / 2 : available));
+  const width = mode === 2 ? Math.floor((available - gap) / 2) - 2 : Math.floor(available);
+  return Math.max(320, width);
 }
 
 function applyDesktopPanelWidths() {
@@ -264,7 +267,7 @@ function resetSite() {
   state = freshState();
   sanitizeState();
   if (!mobileLayout.matches) {
-    state.panels[0].width = Math.round(Math.min(maximumPanelWidth(), window.innerWidth / 2));
+    state.panels[0].width = desktopPanelModeWidth(2);
   }
   applyTouchPanelCount();
   activePanelId = undefined;
