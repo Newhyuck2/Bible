@@ -532,22 +532,55 @@ function syncComboboxInputMode(input) {
   }
 }
 
+function syncTrackFreeScroll() {
+  panelTrack.classList.toggle("free-scroll", !mobileLayout.matches);
+}
+syncTrackFreeScroll();
+
 mobileLayout.addEventListener("change", () => {
   document.querySelectorAll(".combo-input").forEach(syncComboboxInputMode);
   updatePanelCountControls();
+  syncTrackFreeScroll();
 });
 
-// On desktop, wheel scrolling over the header bar pans the panel track, the
-// same motion as dragging its horizontal scrollbar.
+// On desktop, wheel scrolling over the header bar pans the panel track.
+// Wheel ticks arrive in coarse jumps, so instead of stepping instantly the
+// deltas accumulate into a target the track glides toward each frame.
+let headerPanTarget = null;
+let headerPanFrame = 0;
+
+function stepHeaderPan() {
+  headerPanFrame = 0;
+  if (headerPanTarget == null) return;
+  const current = panelTrack.scrollLeft;
+  const remaining = headerPanTarget - current;
+  if (Math.abs(remaining) <= 1) {
+    panelTrack.scrollTo({ left: headerPanTarget, behavior: "instant" });
+    headerPanTarget = null;
+    return;
+  }
+  const step = Math.sign(remaining) * Math.max(1, Math.abs(remaining) * 0.16);
+  panelTrack.scrollTo({ left: current + step, behavior: "instant" });
+  headerPanFrame = requestAnimationFrame(stepHeaderPan);
+}
+
 document.querySelector(".app-header").addEventListener(
   "wheel",
   (event) => {
     if (mobileLayout.matches || !state?.panels?.length) return;
-    const step = event.deltaMode === 1 ? 16 : 1;
-    const delta = (Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY) * step;
+    const unit = event.deltaMode === 1 ? 16 : 1;
+    const delta = (Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY) * unit;
     if (!delta) return;
     event.preventDefault();
-    panelTrack.scrollBy({ left: delta, behavior: "instant" });
+    const maxScroll = Math.max(0, panelTrack.scrollWidth - panelTrack.clientWidth);
+    const base = headerPanTarget ?? panelTrack.scrollLeft;
+    headerPanTarget = Math.max(0, Math.min(base + delta, maxScroll));
+    if (reducedMotion.matches) {
+      panelTrack.scrollTo({ left: headerPanTarget, behavior: "instant" });
+      headerPanTarget = null;
+      return;
+    }
+    if (!headerPanFrame) headerPanFrame = requestAnimationFrame(stepHeaderPan);
   },
   { passive: false },
 );
@@ -1133,6 +1166,7 @@ function movePanel(from, to, { animate = true } = {}) {
   requestAnimationFrame(() => {
     panelTrack.scrollLeft = savedScrollLeft;
     panelTrack.classList.remove("panel-count-changing");
+    panelTrack.scrollLeft = savedScrollLeft;
   });
   saveState();
   updatePanelNumbers();

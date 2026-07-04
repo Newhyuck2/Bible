@@ -266,6 +266,12 @@ p {
   scrollbar-width: thin;
 }
 
+/* Snapping is a touch paging aid; desktop scrolls the track freely so
+   reordering and wheel panning never yank the viewport to a panel edge. */
+.panel-track.free-scroll {
+  scroll-snap-type: none;
+}
+
 .bible-panel {
   display: grid;
   flex: 0 0 clamp(380px, 43vw, 650px);
