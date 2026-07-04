@@ -2498,7 +2498,7 @@ body * {
 
 /* Stable left-to-right panel numbering beside the close control. */
 .panel-selectors {
-  grid-template-columns: 30px 26px minmax(90px, 1fr) 28px minmax(70px, 92px) 28px;
+  grid-template-columns: 30px 26px minmax(90px, 1fr) 28px minmax(96px, 116px) 28px;
 }
 
 .panel-number {

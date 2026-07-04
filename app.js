@@ -1590,12 +1590,11 @@ function buildCopyText(panelState, translations, order) {
   } else {
     const bookName = bookNameFor(translations[0]);
     const translationNames = translations.map((translation) => translationMeta(translation).label).join("-");
+    lines.push(`${bookName} ${range}, ${translationNames}`);
     for (const [verse, texts] of verses) {
-      lines.push(`${bookName} ${panelState.chapter}:${verse}, ${translationNames}`);
       for (const translation of translations) {
         if (texts[translation]) lines.push(`${verse} ${texts[translation]}`);
       }
-      lines.push("");
     }
   }
   return lines.join("\n").trim();
