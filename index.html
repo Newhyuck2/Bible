@@ -8,9 +8,9 @@
     />
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta name="description" content="A compact multi-panel Bible reader" />
-    <meta name="asset-version" content="20260704-1" />
+    <meta name="asset-version" content="20260704-2" />
     <title>Bible</title>
-    <link rel="stylesheet" href="./styles.css?v=20260704-1" />
+    <link rel="stylesheet" href="./styles.css?v=20260704-2" />
   </head>
   <body>
     <header class="app-header">
@@ -31,6 +31,20 @@
           <span>Holy Bible</span>
         </div>
         <div class="translation-list" id="translation-list" aria-label="Translation order"></div>
+        <div class="verse-layout-control" role="group" aria-label="Verse translation layout">
+          <button id="verse-layout-stacked" type="button" aria-label="Stack translations vertically" aria-pressed="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="4" y="4" width="16" height="6" rx="1.5"></rect>
+              <rect x="4" y="14" width="16" height="6" rx="1.5"></rect>
+            </svg>
+          </button>
+          <button id="verse-layout-columns" type="button" aria-label="Show translations side by side" aria-pressed="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="3" y="4" width="8" height="16" rx="1.5"></rect>
+              <rect x="13" y="4" width="8" height="16" rx="1.5"></rect>
+            </svg>
+          </button>
+        </div>
         <div class="panel-count-control" role="group" aria-label="Panels per screen">
           <button id="panel-count-one" type="button" aria-label="Show one panel" aria-pressed="false">
             <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -211,6 +225,6 @@
     </div>
 
     <noscript>JavaScript is required to display the Bible text.</noscript>
-    <script type="module" src="./app.js?v=20260704-1"></script>
+    <script type="module" src="./app.js?v=20260704-2"></script>
   </body>
 </html>

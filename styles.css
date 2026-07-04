@@ -2764,6 +2764,23 @@ body * {
   display: none;
 }
 
+.verse-layout-control,
+.panel-count-control {
+  flex: 0 0 auto;
+  height: 32px;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 3px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+}
+
+.verse-layout-control {
+  display: flex;
+}
+
+.verse-layout-control button,
 .panel-count-control button {
   display: grid;
   width: 29px;
@@ -2776,17 +2793,30 @@ body * {
   color: var(--muted);
 }
 
+.verse-layout-control button.selected,
 .panel-count-control button.selected {
   background: var(--accent-soft);
   color: var(--accent);
 }
 
+.verse-layout-control button:disabled {
+  cursor: default;
+  opacity: 0.28;
+}
+
+.verse-layout-control svg,
 .panel-count-control svg {
   width: 20px;
   height: 20px;
   fill: none;
   stroke: currentColor;
   stroke-width: 1.7;
+}
+
+@media (max-width: 820px), (max-width: 1366px) and (any-pointer: coarse) {
+  .verse-layout-control {
+    display: none;
+  }
 }
 
 /* Phones in landscape and tablets in either orientation use one top row. */
@@ -2799,9 +2829,9 @@ body * {
   }
 
   .compact-toolbar {
-    grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+    grid-template-columns: auto minmax(0, 1fr) auto auto auto auto;
     grid-template-rows: 34px;
-    grid-template-areas: "brand translations view font actions";
+    grid-template-areas: "brand translations verse view font actions";
     gap: 6px;
   }
 
@@ -2822,8 +2852,80 @@ body * {
     background: white;
   }
 
+  html[data-touch-panel-count="1"] .verse-layout-control {
+    grid-area: verse;
+    display: flex;
+  }
+
   .workspace {
     height: calc(100vh - 46px - env(safe-area-inset-top));
     height: calc(100dvh - 46px - env(safe-area-inset-top));
+  }
+}
+
+/* Side-by-side verse layout with a sticky translation heading row. */
+.column-translation-header {
+  display: none;
+}
+
+html[data-verse-layout="columns"] .column-translation-header {
+  position: sticky;
+  top: 0;
+  z-index: 7;
+  display: grid;
+  grid-template-columns: repeat(var(--translation-count), minmax(0, 1fr));
+  gap: 12px;
+  margin: 0 -4px;
+  padding: 8px 6px 8px 32px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(255, 253, 248, 0.96);
+  box-shadow: 0 4px 10px rgba(55, 45, 30, 0.05);
+  backdrop-filter: blur(8px);
+}
+
+.column-translation-heading {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  color: var(--translation-color);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+}
+
+.column-translation-heading::before {
+  width: 5px;
+  height: 5px;
+  margin-right: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  content: "";
+}
+
+html[data-verse-layout="columns"] .verse-group {
+  display: grid;
+  grid-template-columns: repeat(var(--translation-count), minmax(0, 1fr));
+  align-items: start;
+  gap: 12px;
+  padding-left: 32px;
+}
+
+html[data-verse-layout="columns"] .translation-line {
+  display: block;
+  min-width: 0;
+}
+
+html[data-verse-layout="columns"] .translation-line + .translation-line {
+  margin-top: 0;
+}
+
+html[data-verse-layout="columns"] .translation-label {
+  display: none;
+}
+
+@media (max-width: 820px), (max-width: 1366px) and (any-pointer: coarse) {
+  html[data-verse-layout="columns"] .column-translation-header,
+  html[data-verse-layout="columns"] .verse-group {
+    gap: 8px;
   }
 }

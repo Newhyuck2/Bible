@@ -36,6 +36,8 @@ const fontSizeUpButton = document.querySelector("#font-size-up");
 const fontSizeValue = document.querySelector("#font-size-value");
 const panelCountOneButton = document.querySelector("#panel-count-one");
 const panelCountTwoButton = document.querySelector("#panel-count-two");
+const verseLayoutStackedButton = document.querySelector("#verse-layout-stacked");
+const verseLayoutColumnsButton = document.querySelector("#verse-layout-columns");
 const copyDialog = document.querySelector("#copy-dialog");
 const closeCopyButton = document.querySelector("#close-copy");
 const cancelCopyButton = document.querySelector("#cancel-copy");
@@ -66,6 +68,7 @@ function freshState() {
     enabledTranslations: ["ESV", "NIV", "GAE", "SAENEW", "WLB"],
     fontSize: 14,
     touchPanelCount: null,
+    verseLayout: "stacked",
     panels: [{ book: 0, chapter: 1 }],
   };
 }
@@ -89,6 +92,7 @@ function sanitizeState() {
   state.translationOrder = order;
   state.enabledTranslations = state.enabledTranslations.filter((id) => validTranslations.has(id));
   state.fontSize = Math.max(10, Math.min(Number(state.fontSize) || 14, 22));
+  state.verseLayout = state.verseLayout === "columns" ? "columns" : "stacked";
   const savedPanelCount = Number(state.touchPanelCount);
   state.touchPanelCount = savedPanelCount === 1 || savedPanelCount === 2
     ? savedPanelCount
@@ -97,7 +101,7 @@ function sanitizeState() {
     .map((panel) => {
       const book = Math.max(0, Math.min(Number(panel.book) || 0, manifest.books.length - 1));
       const chapter = Math.max(1, Math.min(Number(panel.chapter) || 1, manifest.books[book].chapters));
-      const width = Number(panel.width);
+      const width = panel.width == null ? Number.NaN : Number(panel.width);
       return { book, chapter, width: Number.isFinite(width) ? Math.max(320, Math.min(width, 5000)) : null };
     })
     .slice(0, 12);
@@ -112,6 +116,7 @@ function saveState() {
       enabledTranslations: state.enabledTranslations,
       fontSize: state.fontSize,
       touchPanelCount: state.touchPanelCount,
+      verseLayout: state.verseLayout,
       panels: state.panels.map(({ book, chapter, width }) => ({ book, chapter, width })),
     }),
   );
@@ -119,6 +124,49 @@ function saveState() {
 
 function isTwoPanelTouchMode() {
   return Boolean(state && touchPanelToggleLayout.matches && state.touchPanelCount === 2);
+}
+
+function enabledTranslationIds() {
+  if (!state) return [];
+  return state.translationOrder.filter((id) => state.enabledTranslations.includes(id));
+}
+
+function canUseColumnVerseLayout() {
+  if (!state) return false;
+  if (!mobileLayout.matches) return true;
+  return touchPanelToggleLayout.matches
+    && state.touchPanelCount === 1
+    && enabledTranslationIds().length === 2;
+}
+
+function effectiveVerseLayout() {
+  return state?.verseLayout === "columns" && canUseColumnVerseLayout() ? "columns" : "stacked";
+}
+
+function updateVerseLayoutControls() {
+  if (!state) return;
+  const effectiveLayout = effectiveVerseLayout();
+  const columnsAllowed = canUseColumnVerseLayout();
+  verseLayoutStackedButton.classList.toggle("selected", effectiveLayout === "stacked");
+  verseLayoutColumnsButton.classList.toggle("selected", effectiveLayout === "columns");
+  verseLayoutStackedButton.setAttribute("aria-pressed", String(effectiveLayout === "stacked"));
+  verseLayoutColumnsButton.setAttribute("aria-pressed", String(effectiveLayout === "columns"));
+  verseLayoutColumnsButton.disabled = !columnsAllowed;
+}
+
+function applyVerseLayout(refresh = true) {
+  if (!state) return;
+  document.documentElement.dataset.verseLayout = effectiveVerseLayout();
+  updateVerseLayoutControls();
+  if (refresh && panelElements.size) refreshPanelBodies();
+}
+
+function setVerseLayout(layout) {
+  if (layout !== "stacked" && layout !== "columns") return;
+  if (layout === "columns" && !canUseColumnVerseLayout()) return;
+  state.verseLayout = layout;
+  saveState();
+  applyVerseLayout();
 }
 
 function updatePanelCountControls() {
@@ -148,6 +196,7 @@ function applyTouchPanelCount(alignmentIndex = -1) {
   if (!state) return;
   document.documentElement.dataset.touchPanelCount = String(state.touchPanelCount);
   updatePanelCountControls();
+  applyVerseLayout();
   alignPanelsAfterLayoutChange(alignmentIndex);
 }
 
@@ -156,7 +205,6 @@ function setTouchPanelCount(count) {
   const alignmentIndex = state.panels.length ? panelIndexAtViewportStart() : -1;
   state.touchPanelCount = count;
   saveState();
-  if (count === 2 && state.panels.length < 2) addPanel();
   applyTouchPanelCount(alignmentIndex);
 }
 
@@ -176,6 +224,9 @@ function resetSite() {
   panelElements.clear();
   state = freshState();
   sanitizeState();
+  if (!mobileLayout.matches) {
+    state.panels[0].width = Math.round(Math.min(maximumPanelWidth(), window.innerWidth / 2));
+  }
   applyTouchPanelCount();
   activePanelId = undefined;
   applyFontSize();
@@ -238,7 +289,7 @@ function renderTranslationControls() {
       saveState();
       chip.classList.toggle("selected", shouldEnable);
       chip.setAttribute("aria-checked", String(shouldEnable));
-      refreshPanelBodies();
+      applyVerseLayout();
     };
 
     const name = document.createElement("span");
@@ -282,7 +333,7 @@ function moveTranslation(from, to) {
   state.translationOrder.splice(to, 0, item);
   saveState();
   renderTranslationControls();
-  refreshPanelBodies();
+  applyVerseLayout();
 }
 
 // Native HTML5 drag-and-drop (dragstart/dragover/drop) does not fire on touch
@@ -1246,8 +1297,24 @@ async function loadPanel(panelState, targetVerse = null) {
 function renderPanelBody(panelState) {
   const elements = panelElements.get(panelState.id);
   if (!elements || !panelState.data) return;
-  const enabled = state.translationOrder.filter((id) => state.enabledTranslations.includes(id));
+  const enabled = enabledTranslationIds();
+  const columnLayout = effectiveVerseLayout() === "columns";
   const fragment = document.createDocumentFragment();
+
+  if (columnLayout && enabled.length) {
+    const columnHeader = document.createElement("div");
+    columnHeader.className = "column-translation-header";
+    columnHeader.style.setProperty("--translation-count", String(enabled.length));
+    for (const translation of enabled) {
+      const heading = document.createElement("span");
+      heading.className = "column-translation-heading";
+      heading.lang = translationLanguage(translation);
+      heading.textContent = translationMeta(translation).label;
+      heading.style.setProperty("--translation-color", TRANSLATION_COLORS[translation]);
+      columnHeader.append(heading);
+    }
+    fragment.append(columnHeader);
+  }
 
   for (const [verseNumber, texts] of panelState.data.v) {
     const group = document.createElement("section");
@@ -1258,24 +1325,27 @@ function renderPanelBody(panelState) {
     number.className = "verse-number";
     number.textContent = String(verseNumber);
     group.append(number);
+    group.style.setProperty("--translation-count", String(Math.max(enabled.length, 1)));
 
     let rendered = 0;
-    for (const translation of enabled) {
-      if (!texts[translation]) continue;
-      rendered += 1;
+    enabled.forEach((translation, index) => {
+      const translationText = texts[translation];
+      if (!translationText && !columnLayout) return;
+      if (translationText) rendered += 1;
       const line = document.createElement("div");
       line.className = "translation-line";
       line.lang = translationLanguage(translation);
       line.style.setProperty("--translation-color", TRANSLATION_COLORS[translation]);
+      if (columnLayout) line.style.gridColumn = String(index + 1);
       const label = document.createElement("span");
       label.className = "translation-label";
       label.textContent = translationMeta(translation).label;
       const text = document.createElement("p");
       text.className = "translation-text";
-      text.textContent = texts[translation];
+      text.textContent = translationText || "";
       line.append(label, text);
       group.append(line);
-    }
+    });
 
     if (!rendered) {
       const empty = document.createElement("p");
@@ -1705,6 +1775,8 @@ siteBrand.addEventListener("keydown", (event) => {
 addPanelButton.addEventListener("click", addPanel);
 panelCountOneButton.addEventListener("click", () => setTouchPanelCount(1));
 panelCountTwoButton.addEventListener("click", () => setTouchPanelCount(2));
+verseLayoutStackedButton.addEventListener("click", () => setVerseLayout("stacked"));
+verseLayoutColumnsButton.addEventListener("click", () => setVerseLayout("columns"));
 fontSizeDownButton.addEventListener("click", () => changeFontSize(-1));
 fontSizeUpButton.addEventListener("click", () => changeFontSize(1));
 openSearchButton.addEventListener("click", openSearch);
