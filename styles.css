@@ -2852,7 +2852,7 @@ body * {
     background: white;
   }
 
-  html[data-touch-panel-count="1"] .verse-layout-control {
+  .verse-layout-control {
     grid-area: verse;
     display: flex;
   }
@@ -2887,19 +2887,12 @@ html[data-verse-layout="columns"] .column-translation-header {
   display: flex;
   min-width: 0;
   align-items: center;
+  justify-content: center;
+  text-align: center;
   color: var(--translation-color);
   font-size: 10px;
   font-weight: 900;
   letter-spacing: 0.03em;
-}
-
-.column-translation-heading::before {
-  width: 5px;
-  height: 5px;
-  margin-right: 5px;
-  border-radius: 50%;
-  background: currentColor;
-  content: "";
 }
 
 html[data-verse-layout="columns"] .verse-group {

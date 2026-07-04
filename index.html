@@ -8,9 +8,9 @@
     />
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta name="description" content="A compact multi-panel Bible reader" />
-    <meta name="asset-version" content="20260704-2" />
+    <meta name="asset-version" content="20260704-3" />
     <title>Bible</title>
-    <link rel="stylesheet" href="./styles.css?v=20260704-2" />
+    <link rel="stylesheet" href="./styles.css?v=20260704-3" />
   </head>
   <body>
     <header class="app-header">
@@ -34,14 +34,12 @@
         <div class="verse-layout-control" role="group" aria-label="Verse translation layout">
           <button id="verse-layout-stacked" type="button" aria-label="Stack translations vertically" aria-pressed="false">
             <svg viewBox="0 0 24 24" aria-hidden="true">
-              <rect x="4" y="4" width="16" height="6" rx="1.5"></rect>
-              <rect x="4" y="14" width="16" height="6" rx="1.5"></rect>
+              <path d="M5 6h14M5 12h14M5 18h14" stroke-linecap="round"></path>
             </svg>
           </button>
           <button id="verse-layout-columns" type="button" aria-label="Show translations side by side" aria-pressed="false">
             <svg viewBox="0 0 24 24" aria-hidden="true">
-              <rect x="3" y="4" width="8" height="16" rx="1.5"></rect>
-              <rect x="13" y="4" width="8" height="16" rx="1.5"></rect>
+              <path d="M6 5v14M12 5v14M18 5v14" stroke-linecap="round"></path>
             </svg>
           </button>
         </div>
@@ -225,6 +223,6 @@
     </div>
 
     <noscript>JavaScript is required to display the Bible text.</noscript>
-    <script type="module" src="./app.js?v=20260704-2"></script>
+    <script type="module" src="./app.js?v=20260704-3"></script>
   </body>
 </html>

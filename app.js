@@ -134,9 +134,7 @@ function enabledTranslationIds() {
 function canUseColumnVerseLayout() {
   if (!state) return false;
   if (!mobileLayout.matches) return true;
-  return touchPanelToggleLayout.matches
-    && state.touchPanelCount === 1
-    && enabledTranslationIds().length === 2;
+  return touchPanelToggleLayout.matches && state.touchPanelCount === 1;
 }
 
 function effectiveVerseLayout() {
@@ -147,11 +145,13 @@ function updateVerseLayoutControls() {
   if (!state) return;
   const effectiveLayout = effectiveVerseLayout();
   const columnsAllowed = canUseColumnVerseLayout();
+  const controlsDisabled = isTwoPanelTouchMode();
   verseLayoutStackedButton.classList.toggle("selected", effectiveLayout === "stacked");
   verseLayoutColumnsButton.classList.toggle("selected", effectiveLayout === "columns");
   verseLayoutStackedButton.setAttribute("aria-pressed", String(effectiveLayout === "stacked"));
   verseLayoutColumnsButton.setAttribute("aria-pressed", String(effectiveLayout === "columns"));
-  verseLayoutColumnsButton.disabled = !columnsAllowed;
+  verseLayoutStackedButton.disabled = controlsDisabled;
+  verseLayoutColumnsButton.disabled = controlsDisabled || !columnsAllowed;
 }
 
 function applyVerseLayout(refresh = true) {
