@@ -36,6 +36,7 @@ const fontSizeUpButton = document.querySelector("#font-size-up");
 const fontSizeValue = document.querySelector("#font-size-value");
 const panelCountOneButton = document.querySelector("#panel-count-one");
 const panelCountTwoButton = document.querySelector("#panel-count-two");
+const panelFitVisibleButton = document.querySelector("#panel-fit-visible");
 const verseLayoutStackedButton = document.querySelector("#verse-layout-stacked");
 const verseLayoutColumnsButton = document.querySelector("#verse-layout-columns");
 const copyDialog = document.querySelector("#copy-dialog");
@@ -182,25 +183,32 @@ function updatePanelCountControls() {
   panelCountTwoButton.classList.toggle("selected", twoSelected);
   panelCountOneButton.setAttribute("aria-pressed", String(oneSelected));
   panelCountTwoButton.setAttribute("aria-pressed", String(twoSelected));
+  panelFitVisibleButton.disabled = !desktop || state.panels.length < 3;
 }
 
-// The two-panel width is shaved a little below half the track so two panels
-// plus the gap always fit inside one screen without a horizontal scrollbar.
-function desktopPanelModeWidth(mode) {
+// Width for `count` side-by-side panels; multi-panel widths sit slightly
+// under an exact division so the set plus its gaps always fits inside one
+// screen without a horizontal scrollbar.
+function desktopPanelFitWidth(count) {
   const gap = Number.parseFloat(getComputedStyle(panelTrack).columnGap) || 0;
   const available = maximumPanelWidth();
-  const width = mode === 2 ? Math.floor((available - gap) / 2) - 2 : Math.floor(available);
+  const width = count > 1
+    ? Math.floor((available - gap * (count - 1)) / count) - 2
+    : Math.floor(available);
   return Math.max(320, width);
 }
 
-function applyDesktopPanelWidths() {
-  if (!state?.desktopPanelMode) return;
-  const width = desktopPanelModeWidth(state.desktopPanelMode);
+function setAllDesktopPanelWidths(width) {
   for (const panelState of state.panels) {
     panelState.width = width;
     const elements = panelElements.get(panelState.id);
     if (elements) elements.panel.style.flexBasis = `${width}px`;
   }
+}
+
+function applyDesktopPanelWidths() {
+  if (!state?.desktopPanelMode) return;
+  setAllDesktopPanelWidths(desktopPanelFitWidth(state.desktopPanelMode === 2 ? 2 : 1));
 }
 
 function setDesktopPanelMode(mode) {
@@ -218,6 +226,33 @@ function clearDesktopPanelMode() {
   if (!state?.desktopPanelMode) return;
   state.desktopPanelMode = null;
   updatePanelCountControls();
+}
+
+function visiblePanelSpan() {
+  const trackRect = panelTrack.getBoundingClientRect();
+  let first = -1;
+  let count = 0;
+  state.panels.forEach((panelState, index) => {
+    const panel = panelElements.get(panelState.id)?.panel;
+    if (!panel) return;
+    const rect = panel.getBoundingClientRect();
+    if (rect.right > trackRect.left + 1 && rect.left < trackRect.right - 1) {
+      if (first < 0) first = index;
+      count += 1;
+    }
+  });
+  return { first: Math.max(0, first), count: Math.max(1, count) };
+}
+
+// Give every panel an equal share of one screen, sized so exactly the panels
+// that were on screen (clipped ones included) fill it edge to edge.
+function fitVisiblePanels() {
+  if (mobileLayout.matches || state.panels.length < 3) return;
+  const { first, count } = visiblePanelSpan();
+  setAllDesktopPanelWidths(desktopPanelFitWidth(count));
+  clearDesktopPanelMode();
+  saveState();
+  alignPanelsAfterLayoutChange(first);
 }
 
 function alignPanelsAfterLayoutChange(index) {
@@ -267,7 +302,7 @@ function resetSite() {
   state = freshState();
   sanitizeState();
   if (!mobileLayout.matches) {
-    state.panels[0].width = desktopPanelModeWidth(2);
+    state.panels[0].width = desktopPanelFitWidth(2);
   }
   applyTouchPanelCount();
   activePanelId = undefined;
@@ -501,6 +536,21 @@ mobileLayout.addEventListener("change", () => {
   document.querySelectorAll(".combo-input").forEach(syncComboboxInputMode);
   updatePanelCountControls();
 });
+
+// On desktop, wheel scrolling over the header bar pans the panel track, the
+// same motion as dragging its horizontal scrollbar.
+document.querySelector(".app-header").addEventListener(
+  "wheel",
+  (event) => {
+    if (mobileLayout.matches || !state?.panels?.length) return;
+    const step = event.deltaMode === 1 ? 16 : 1;
+    const delta = (Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY) * step;
+    if (!delta) return;
+    event.preventDefault();
+    panelTrack.scrollBy({ left: delta, behavior: "instant" });
+  },
+  { passive: false },
+);
 
 // A selected desktop preset means "full screen" or "half screen", so the
 // widths follow the window when it is resized.
@@ -920,6 +970,7 @@ function createPanelElement(panelState, shouldScroll = false) {
   updatePanelNumbers();
   updatePanelMoveButtons();
   updateRemoveButtons();
+  updatePanelCountControls();
   setActivePanel(id);
   loadPanel(panelState);
 
@@ -975,6 +1026,7 @@ function removePanel(id) {
   updatePanelNumbers();
   updateRemoveButtons();
   updatePanelMoveButtons();
+  updatePanelCountControls();
 
   if (!removedPanel || reducedMotion.matches) {
     removedPanel?.remove();
@@ -1072,7 +1124,16 @@ function movePanel(from, to, { animate = true } = {}) {
   state.panels.splice(to, 0, moved);
   const movedPanel = panelElements.get(moved.id).panel;
   const nextState = state.panels[to + 1];
+  // Reordering must swap panels in place: browsers otherwise scroll to follow
+  // the moved node (scroll anchoring / snap), dragging the whole view along.
+  const savedScrollLeft = panelTrack.scrollLeft;
+  panelTrack.classList.add("panel-count-changing");
   panelTrack.insertBefore(movedPanel, nextState ? panelElements.get(nextState.id).panel : null);
+  panelTrack.scrollLeft = savedScrollLeft;
+  requestAnimationFrame(() => {
+    panelTrack.scrollLeft = savedScrollLeft;
+    panelTrack.classList.remove("panel-count-changing");
+  });
   saveState();
   updatePanelNumbers();
   updatePanelMoveButtons();
@@ -1838,6 +1899,7 @@ panelCountTwoButton.addEventListener("click", () => {
   if (mobileLayout.matches) setTouchPanelCount(2);
   else setDesktopPanelMode(2);
 });
+panelFitVisibleButton.addEventListener("click", fitVisiblePanels);
 verseLayoutStackedButton.addEventListener("click", () => setVerseLayout("stacked"));
 verseLayoutColumnsButton.addEventListener("click", () => setVerseLayout("columns"));
 fontSizeDownButton.addEventListener("click", () => changeFontSize(-1));
