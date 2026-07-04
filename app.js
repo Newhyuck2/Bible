@@ -65,7 +65,7 @@ const searchWorker = new Worker(`./search-worker.js?v=${ASSET_VERSION}`);
 function freshState() {
   return {
     translationOrder: ["ESV", "NIV", "GAE", "SAENEW", "WLB"],
-    enabledTranslations: ["ESV", "NIV", "GAE", "SAENEW", "WLB"],
+    enabledTranslations: ["ESV", "NIV", "GAE"],
     fontSize: 14,
     touchPanelCount: null,
     verseLayout: "stacked",
