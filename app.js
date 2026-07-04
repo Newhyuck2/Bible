@@ -7,9 +7,16 @@ const TRANSLATION_COLORS = {
   WLB: "#a24f62",
 };
 const ASSET_VERSION = document.querySelector('meta[name="asset-version"]').content;
-const MOBILE_LAYOUT_QUERY = "(max-width: 820px), (pointer: coarse)";
+const MOBILE_LAYOUT_QUERY = "(max-width: 820px), (max-width: 1366px) and (any-pointer: coarse)";
 const mobileLayout = window.matchMedia(MOBILE_LAYOUT_QUERY);
-const landscapeMobile = window.matchMedia("(orientation: landscape) and (pointer: coarse)");
+const landscapeMobile = window.matchMedia(
+  "(orientation: landscape) and (max-width: 1366px) and (any-pointer: coarse)",
+);
+const touchPanelToggleLayout = window.matchMedia(
+  "(orientation: landscape) and (max-width: 1366px) and (any-pointer: coarse), "
+    + "(min-width: 600px) and (max-width: 1366px) and (any-pointer: coarse)",
+);
+const portraitLayout = window.matchMedia("(orientation: portrait)");
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
 const panelTrack = document.querySelector("#panel-track");
@@ -27,6 +34,8 @@ const searchResults = document.querySelector("#search-results");
 const fontSizeDownButton = document.querySelector("#font-size-down");
 const fontSizeUpButton = document.querySelector("#font-size-up");
 const fontSizeValue = document.querySelector("#font-size-value");
+const panelCountOneButton = document.querySelector("#panel-count-one");
+const panelCountTwoButton = document.querySelector("#panel-count-two");
 const copyDialog = document.querySelector("#copy-dialog");
 const closeCopyButton = document.querySelector("#close-copy");
 const cancelCopyButton = document.querySelector("#cancel-copy");
@@ -46,6 +55,7 @@ let searchRequestId = 0;
 let copyPanelState = null;
 let copyTranslationOrder = [];
 let panelMutationInProgress = false;
+let panelLayoutFrame = 0;
 const chapterCache = new Map();
 const panelElements = new Map();
 const searchWorker = new Worker(`./search-worker.js?v=${ASSET_VERSION}`);
@@ -55,6 +65,7 @@ function freshState() {
     translationOrder: ["ESV", "NIV", "GAE", "SAENEW", "WLB"],
     enabledTranslations: ["ESV", "NIV", "GAE", "SAENEW", "WLB"],
     fontSize: 14,
+    touchPanelCount: null,
     panels: [{ book: 0, chapter: 1 }],
   };
 }
@@ -78,12 +89,16 @@ function sanitizeState() {
   state.translationOrder = order;
   state.enabledTranslations = state.enabledTranslations.filter((id) => validTranslations.has(id));
   state.fontSize = Math.max(10, Math.min(Number(state.fontSize) || 14, 22));
+  const savedPanelCount = Number(state.touchPanelCount);
+  state.touchPanelCount = savedPanelCount === 1 || savedPanelCount === 2
+    ? savedPanelCount
+    : landscapeMobile.matches ? 2 : 1;
   state.panels = state.panels
     .map((panel) => {
       const book = Math.max(0, Math.min(Number(panel.book) || 0, manifest.books.length - 1));
       const chapter = Math.max(1, Math.min(Number(panel.chapter) || 1, manifest.books[book].chapters));
       const width = Number(panel.width);
-      return { book, chapter, width: Number.isFinite(width) ? Math.max(320, Math.min(width, 1000)) : null };
+      return { book, chapter, width: Number.isFinite(width) ? Math.max(320, Math.min(width, 5000)) : null };
     })
     .slice(0, 12);
   if (!state.panels.length) state.panels = [{ book: 0, chapter: 1 }];
@@ -96,9 +111,60 @@ function saveState() {
       translationOrder: state.translationOrder,
       enabledTranslations: state.enabledTranslations,
       fontSize: state.fontSize,
+      touchPanelCount: state.touchPanelCount,
       panels: state.panels.map(({ book, chapter, width }) => ({ book, chapter, width })),
     }),
   );
+}
+
+function isTwoPanelTouchMode() {
+  return Boolean(state && touchPanelToggleLayout.matches && state.touchPanelCount === 2);
+}
+
+function updatePanelCountControls() {
+  if (!state) return;
+  const onePanel = state.touchPanelCount === 1;
+  panelCountOneButton.classList.toggle("selected", onePanel);
+  panelCountTwoButton.classList.toggle("selected", !onePanel);
+  panelCountOneButton.setAttribute("aria-pressed", String(onePanel));
+  panelCountTwoButton.setAttribute("aria-pressed", String(!onePanel));
+}
+
+function alignPanelsAfterLayoutChange(index) {
+  if (!state?.panels?.length || index < 0) return;
+  const targetIndex = Math.max(0, Math.min(index, state.panels.length - 1));
+  panelTrack.classList.add("panel-count-changing");
+  requestAnimationFrame(() => {
+    panelTrack.scrollLeft = panelScrollLeft(targetIndex);
+    requestAnimationFrame(() => {
+      panelTrack.scrollLeft = panelScrollLeft(targetIndex);
+      panelTrack.classList.remove("panel-count-changing");
+      panelTrack.scrollLeft = panelScrollLeft(targetIndex);
+    });
+  });
+}
+
+function applyTouchPanelCount(alignmentIndex = -1) {
+  if (!state) return;
+  document.documentElement.dataset.touchPanelCount = String(state.touchPanelCount);
+  updatePanelCountControls();
+  alignPanelsAfterLayoutChange(alignmentIndex);
+}
+
+function setTouchPanelCount(count) {
+  if (count !== 1 && count !== 2) return;
+  const alignmentIndex = state.panels.length ? panelIndexAtViewportStart() : -1;
+  state.touchPanelCount = count;
+  saveState();
+  if (count === 2 && state.panels.length < 2) addPanel();
+  applyTouchPanelCount(alignmentIndex);
+}
+
+function schedulePanelLayoutAlignment() {
+  if (!state) return;
+  cancelAnimationFrame(panelLayoutFrame);
+  const activeIndex = state.panels.findIndex((panelState) => panelState.id === activePanelId);
+  panelLayoutFrame = requestAnimationFrame(() => applyTouchPanelCount(Math.max(0, activeIndex)));
 }
 
 function resetSite() {
@@ -110,6 +176,7 @@ function resetSite() {
   panelElements.clear();
   state = freshState();
   sanitizeState();
+  applyTouchPanelCount();
   activePanelId = undefined;
   applyFontSize();
   renderTranslationControls();
@@ -504,7 +571,12 @@ function setupPanelSwipe(panel, content) {
   }, true);
 
   content.addEventListener("touchstart", (event) => {
-    if (!mobileLayout.matches || state.panels.length < 2 || event.touches.length !== 1) return;
+    if (event.touches.length !== 1) {
+      gesture = null;
+      document.body.classList.remove("swiping-panels");
+      return;
+    }
+    if (!mobileLayout.matches || state.panels.length < 2) return;
     const touch = event.touches[0];
     gesture = {
       touchId: touch.identifier,
@@ -518,6 +590,11 @@ function setupPanelSwipe(panel, content) {
 
   content.addEventListener("touchmove", (event) => {
     if (!gesture) return;
+    if (event.touches.length !== 1) {
+      gesture = null;
+      document.body.classList.remove("swiping-panels");
+      return;
+    }
     if (panelTrack.classList.contains("panel-reorder-active")) {
       gesture = null;
       return;
@@ -573,6 +650,13 @@ function chapterItems(bookIndex) {
   }));
 }
 
+function maximumPanelWidth() {
+  const trackStyle = getComputedStyle(panelTrack);
+  const horizontalPadding = (Number.parseFloat(trackStyle.paddingLeft) || 0)
+    + (Number.parseFloat(trackStyle.paddingRight) || 0);
+  return Math.max(320, panelTrack.clientWidth - horizontalPadding);
+}
+
 function setupPanelResize(panel, handle, panelState) {
   handle.addEventListener("pointerdown", (event) => {
     if (event.button !== 0) return;
@@ -584,7 +668,7 @@ function setupPanelResize(panel, handle, panelState) {
     handle.setPointerCapture(event.pointerId);
 
     const resize = (moveEvent) => {
-      const width = Math.max(320, Math.min(startWidth + moveEvent.clientX - startX, 1000));
+      const width = Math.max(320, Math.min(startWidth + moveEvent.clientX - startX, maximumPanelWidth()));
       panelState.width = Math.round(width);
       panel.style.flexBasis = `${panelState.width}px`;
     };
@@ -646,7 +730,12 @@ function createPanelElement(panelState, shouldScroll = false) {
   panel.dataset.panelId = id;
   panelState.selectionAnchor = null;
   panelState.selectionEnd = null;
-  if (panelState.width) panel.style.flexBasis = `${panelState.width}px`;
+  if (panelState.width) {
+    const renderedWidth = mobileLayout.matches
+      ? panelState.width
+      : Math.min(panelState.width, maximumPanelWidth());
+    panel.style.flexBasis = `${renderedWidth}px`;
+  }
   panel.addEventListener("pointerdown", () => setActivePanel(id));
   panel.addEventListener("focusin", () => setActivePanel(id));
 
@@ -702,7 +791,7 @@ function createPanelElement(panelState, shouldScroll = false) {
   setupPanelResize(panel, resizeHandle, panelState);
   setupPanelMoveReveal(panel, moveLeft, moveRight);
   setupPanelSwipe(panel, content);
-  setupLandscapePanelLongPress(panel, panelState);
+  setupTouchPanelLongPress(panel, panelState);
 
   panelElements.set(id, {
     panel,
@@ -747,8 +836,9 @@ function addPanel() {
   const panelState = { book: source?.book ?? 0, chapter: source?.chapter ?? 1, width: source?.width ?? null };
   state.panels.push(panelState);
   saveState();
-  const panel = createPanelElement(panelState, !landscapeMobile.matches);
-  if (landscapeMobile.matches) {
+  const twoPanelTouchMode = isTwoPanelTouchMode();
+  const panel = createPanelElement(panelState, !twoPanelTouchMode);
+  if (twoPanelTouchMode) {
     panel.animate(
       [
         { opacity: 0, transform: "translateX(24px)" },
@@ -798,7 +888,7 @@ function removePanel(id) {
       // Mandatory snap would fight the glide, so disable it for the
       // duration (collapsePanel's finish restores it).
       panelTrack.classList.add("removing-panel");
-      const target = landscapeMobile.matches ? state.panels.length - 2 : state.panels.length - 1;
+      const target = isTwoPanelTouchMode() ? state.panels.length - 2 : state.panels.length - 1;
       animateTrackScroll(panelScrollLeft(Math.max(0, target)), 320, collapse);
     } else {
       collapse();
@@ -891,9 +981,9 @@ function movePanel(from, to, { animate = true } = {}) {
   }
 }
 
-// On a landscape phone, holding anywhere on the reading surface lifts the
-// panel. Only the two panels currently visible can swap with each other.
-function setupLandscapePanelLongPress(panel, panelState) {
+// In a two-panel touch layout, holding the reading surface lifts a panel.
+// Only the two panels currently visible can swap with each other.
+function setupTouchPanelLongPress(panel, panelState) {
   let gesture = null;
   let suppressClickUntil = 0;
   const findTouch = (touches, id) => {
@@ -901,6 +991,18 @@ function setupLandscapePanelLongPress(panel, panelState) {
       if (touches[index].identifier === id) return touches[index];
     }
     return null;
+  };
+  const cancelGesture = () => {
+    if (!gesture) return;
+    window.clearTimeout(gesture.timer);
+    const wasActive = gesture.active;
+    gesture = null;
+    if (!wasActive) return;
+    panel.classList.remove("panel-longpress-dragging");
+    panel.style.transform = "";
+    panelTrack.classList.remove("panel-reorder-active");
+    document.body.classList.remove("reordering-chip");
+    for (const { panel: candidate } of panelElements.values()) candidate.classList.remove("drop-target");
   };
 
   panel.addEventListener("click", (event) => {
@@ -910,7 +1012,11 @@ function setupLandscapePanelLongPress(panel, panelState) {
   }, true);
 
   panel.addEventListener("touchstart", (event) => {
-    if (!landscapeMobile.matches || event.touches.length !== 1) return;
+    if (event.touches.length !== 1) {
+      cancelGesture();
+      return;
+    }
+    if (!touchPanelToggleLayout.matches || !isTwoPanelTouchMode()) return;
     if (panelMutationInProgress || state.panels.length < 2) return;
     if (event.target.closest("button, input, .combo-menu, .panel-resize-handle")) return;
 
@@ -938,6 +1044,10 @@ function setupLandscapePanelLongPress(panel, panelState) {
 
   panel.addEventListener("touchmove", (event) => {
     if (!gesture) return;
+    if (event.touches.length !== 1) {
+      cancelGesture();
+      return;
+    }
     const touch = findTouch(event.touches, gesture.touchId);
     if (!touch) return;
     const dx = touch.clientX - gesture.startX;
@@ -1576,6 +1686,7 @@ async function init() {
     manifest = await response.json();
     state = loadState();
     sanitizeState();
+    applyTouchPanelCount();
     applyFontSize();
     renderTranslationControls();
     for (const panel of state.panels) createPanelElement(panel);
@@ -1592,6 +1703,8 @@ siteBrand.addEventListener("keydown", (event) => {
   resetSite();
 });
 addPanelButton.addEventListener("click", addPanel);
+panelCountOneButton.addEventListener("click", () => setTouchPanelCount(1));
+panelCountTwoButton.addEventListener("click", () => setTouchPanelCount(2));
 fontSizeDownButton.addEventListener("click", () => changeFontSize(-1));
 fontSizeUpButton.addEventListener("click", () => changeFontSize(1));
 openSearchButton.addEventListener("click", openSearch);
@@ -1611,6 +1724,8 @@ searchForm.addEventListener("submit", (event) => {
   if (query.length < 2) return;
   runSearch(query);
 });
+portraitLayout.addEventListener("change", schedulePanelLayoutAlignment);
+touchPanelToggleLayout.addEventListener("change", schedulePanelLayoutAlignment);
 
 // GitHub Pages' CDN can keep serving a stale index.html/app.js for a while
 // after a deploy, and an already-open tab never re-fetches it on its own.
