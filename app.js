@@ -543,9 +543,11 @@ mobileLayout.addEventListener("change", () => {
   syncTrackFreeScroll();
 });
 
-// On desktop, wheel scrolling over the header bar pans the panel track.
-// Wheel ticks arrive in coarse jumps, so instead of stepping instantly the
-// deltas accumulate into a target the track glides toward each frame.
+// On desktop, wheel scrolling anywhere outside the reading surface — the app
+// header bar, each panel's header bar, and the empty strips around the panels
+// — pans the panel track. Wheel ticks arrive in coarse jumps, so instead of
+// stepping instantly the deltas accumulate into a target the track glides
+// toward each frame.
 let headerPanTarget = null;
 let headerPanFrame = 0;
 
@@ -564,10 +566,20 @@ function stepHeaderPan() {
   headerPanFrame = requestAnimationFrame(stepHeaderPan);
 }
 
-document.querySelector(".app-header").addEventListener(
+function isWheelPanRegion(target) {
+  if (!(target instanceof Element)) return false;
+  // An open combo dropdown scrolls its own option list.
+  if (target.closest(".combo-menu")) return false;
+  if (target.closest(".app-header") || target.closest(".panel-header")) return true;
+  // The track and workspace are only hit directly in the gaps around panels.
+  return target === panelTrack || target.classList.contains("workspace");
+}
+
+document.addEventListener(
   "wheel",
   (event) => {
     if (mobileLayout.matches || !state?.panels?.length) return;
+    if (!isWheelPanRegion(event.target)) return;
     const unit = event.deltaMode === 1 ? 16 : 1;
     const delta = (Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY) * unit;
     if (!delta) return;
