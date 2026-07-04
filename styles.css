@@ -2760,10 +2760,6 @@ body * {
   }
 }
 
-.panel-count-control {
-  display: none;
-}
-
 .verse-layout-control,
 .panel-count-control {
   flex: 0 0 auto;
@@ -2776,7 +2772,8 @@ body * {
   background: white;
 }
 
-.verse-layout-control {
+.verse-layout-control,
+.panel-count-control {
   display: flex;
 }
 
@@ -2814,7 +2811,8 @@ body * {
 }
 
 @media (max-width: 820px), (max-width: 1366px) and (any-pointer: coarse) {
-  .verse-layout-control {
+  .verse-layout-control,
+  .panel-count-control {
     display: none;
   }
 }

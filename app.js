@@ -68,6 +68,7 @@ function freshState() {
     enabledTranslations: ["ESV", "NIV", "GAE"],
     fontSize: 14,
     touchPanelCount: null,
+    desktopPanelMode: null,
     verseLayout: "stacked",
     panels: [{ book: 0, chapter: 1 }],
   };
@@ -97,6 +98,8 @@ function sanitizeState() {
   state.touchPanelCount = savedPanelCount === 1 || savedPanelCount === 2
     ? savedPanelCount
     : landscapeMobile.matches ? 2 : 1;
+  const savedDesktopMode = Number(state.desktopPanelMode);
+  state.desktopPanelMode = savedDesktopMode === 1 || savedDesktopMode === 2 ? savedDesktopMode : null;
   state.panels = state.panels
     .map((panel) => {
       const book = Math.max(0, Math.min(Number(panel.book) || 0, manifest.books.length - 1));
@@ -116,6 +119,7 @@ function saveState() {
       enabledTranslations: state.enabledTranslations,
       fontSize: state.fontSize,
       touchPanelCount: state.touchPanelCount,
+      desktopPanelMode: state.desktopPanelMode,
       verseLayout: state.verseLayout,
       panels: state.panels.map(({ book, chapter, width }) => ({ book, chapter, width })),
     }),
@@ -171,11 +175,46 @@ function setVerseLayout(layout) {
 
 function updatePanelCountControls() {
   if (!state) return;
-  const onePanel = state.touchPanelCount === 1;
-  panelCountOneButton.classList.toggle("selected", onePanel);
-  panelCountTwoButton.classList.toggle("selected", !onePanel);
-  panelCountOneButton.setAttribute("aria-pressed", String(onePanel));
-  panelCountTwoButton.setAttribute("aria-pressed", String(!onePanel));
+  const desktop = !mobileLayout.matches;
+  const oneSelected = desktop ? state.desktopPanelMode === 1 : state.touchPanelCount === 1;
+  const twoSelected = desktop ? state.desktopPanelMode === 2 : state.touchPanelCount !== 1;
+  panelCountOneButton.classList.toggle("selected", oneSelected);
+  panelCountTwoButton.classList.toggle("selected", twoSelected);
+  panelCountOneButton.setAttribute("aria-pressed", String(oneSelected));
+  panelCountTwoButton.setAttribute("aria-pressed", String(twoSelected));
+}
+
+function desktopPanelModeWidth(mode) {
+  const gap = Number.parseFloat(getComputedStyle(panelTrack).columnGap) || 0;
+  const available = maximumPanelWidth();
+  return Math.max(320, Math.round(mode === 2 ? (available - gap) / 2 : available));
+}
+
+function applyDesktopPanelWidths() {
+  if (!state?.desktopPanelMode) return;
+  const width = desktopPanelModeWidth(state.desktopPanelMode);
+  for (const panelState of state.panels) {
+    panelState.width = width;
+    const elements = panelElements.get(panelState.id);
+    if (elements) elements.panel.style.flexBasis = `${width}px`;
+  }
+}
+
+function setDesktopPanelMode(mode) {
+  if (mode !== 1 && mode !== 2) return;
+  state.desktopPanelMode = mode;
+  applyDesktopPanelWidths();
+  updatePanelCountControls();
+  saveState();
+}
+
+// Manually resizing a panel breaks the uniform widths the desktop one/two
+// panel presets promise, so the preset selection is dropped. Saving is left
+// to the caller.
+function clearDesktopPanelMode() {
+  if (!state?.desktopPanelMode) return;
+  state.desktopPanelMode = null;
+  updatePanelCountControls();
 }
 
 function alignPanelsAfterLayoutChange(index) {
@@ -457,6 +496,19 @@ function syncComboboxInputMode(input) {
 
 mobileLayout.addEventListener("change", () => {
   document.querySelectorAll(".combo-input").forEach(syncComboboxInputMode);
+  updatePanelCountControls();
+});
+
+// A selected desktop preset means "full screen" or "half screen", so the
+// widths follow the window when it is resized.
+let desktopModeResizeTimer = 0;
+window.addEventListener("resize", () => {
+  if (mobileLayout.matches || !state?.desktopPanelMode) return;
+  window.clearTimeout(desktopModeResizeTimer);
+  desktopModeResizeTimer = window.setTimeout(() => {
+    applyDesktopPanelWidths();
+    saveState();
+  }, 150);
 });
 
 function panelScrollLeft(index) {
@@ -722,6 +774,7 @@ function setupPanelResize(panel, handle, panelState) {
       const width = Math.max(320, Math.min(startWidth + moveEvent.clientX - startX, maximumPanelWidth()));
       panelState.width = Math.round(width);
       panel.style.flexBasis = `${panelState.width}px`;
+      clearDesktopPanelMode();
     };
     const finish = () => {
       document.body.classList.remove("resizing-panel");
@@ -739,6 +792,7 @@ function setupPanelResize(panel, handle, panelState) {
   handle.addEventListener("dblclick", () => {
     panelState.width = null;
     panel.style.removeProperty("flex-basis");
+    clearDesktopPanelMode();
     saveState();
   });
 }
@@ -1760,6 +1814,7 @@ async function init() {
     applyFontSize();
     renderTranslationControls();
     for (const panel of state.panels) createPanelElement(panel);
+    if (!mobileLayout.matches) applyDesktopPanelWidths();
     saveState();
   } catch (error) {
     panelTrack.innerHTML = `<div class="panel-message error">Could not start the site: ${escapeHtml(error.message)}<br />Use a local HTTP server when previewing.</div>`;
@@ -1773,8 +1828,14 @@ siteBrand.addEventListener("keydown", (event) => {
   resetSite();
 });
 addPanelButton.addEventListener("click", addPanel);
-panelCountOneButton.addEventListener("click", () => setTouchPanelCount(1));
-panelCountTwoButton.addEventListener("click", () => setTouchPanelCount(2));
+panelCountOneButton.addEventListener("click", () => {
+  if (mobileLayout.matches) setTouchPanelCount(1);
+  else setDesktopPanelMode(1);
+});
+panelCountTwoButton.addEventListener("click", () => {
+  if (mobileLayout.matches) setTouchPanelCount(2);
+  else setDesktopPanelMode(2);
+});
 verseLayoutStackedButton.addEventListener("click", () => setVerseLayout("stacked"));
 verseLayoutColumnsButton.addEventListener("click", () => setVerseLayout("columns"));
 fontSizeDownButton.addEventListener("click", () => changeFontSize(-1));
