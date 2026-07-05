@@ -665,7 +665,10 @@ function setupCombobox({ input, toggle, menu, items, selectedValue, matches, onS
 
   function render(query = "") {
     filtered = allItems.filter((item) => matches(item, query));
-    highlighted = 0;
+    // With no query, start the list from the current selection instead of
+    // the top; while typing, keep the first match highlighted.
+    const selectedIndex = query.trim() ? -1 : filtered.findIndex((item) => item.value === selected);
+    highlighted = selectedIndex >= 0 ? selectedIndex : 0;
     menu.replaceChildren();
     for (const [index, item] of filtered.entries()) {
       const option = document.createElement("button");
@@ -695,10 +698,17 @@ function setupCombobox({ input, toggle, menu, items, selectedValue, matches, onS
     menu.querySelectorAll(".combo-option")[highlighted]?.scrollIntoView({ block: "nearest" });
   }
 
+  function centerHighlighted() {
+    const option = menu.querySelectorAll(".combo-option")[highlighted];
+    if (!option) return;
+    menu.scrollTop = option.offsetTop - (menu.clientHeight - option.offsetHeight) / 2;
+  }
+
   function open(selectText = false) {
     render(selectText ? "" : input.value === selectedItem()?.label ? "" : input.value);
     menu.hidden = false;
     input.setAttribute("aria-expanded", "true");
+    centerHighlighted();
     if (selectText && !input.readOnly) input.select();
   }
 
@@ -1701,10 +1711,12 @@ function buildCopyText(panelState, translations, order) {
     const bookName = bookNameFor(translations[0]);
     const translationNames = translations.map((translation) => translationMeta(translation).label).join("-");
     lines.push(`${bookName} ${range}, ${translationNames}`);
+    lines.push("");
     for (const [verse, texts] of verses) {
       for (const translation of translations) {
         if (texts[translation]) lines.push(`${verse} ${texts[translation]}`);
       }
+      lines.push("");
     }
   }
   return lines.join("\n").trim();
