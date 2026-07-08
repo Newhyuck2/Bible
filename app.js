@@ -49,6 +49,8 @@ const copyStatus = document.querySelector("#copy-status");
 const siteBrand = document.querySelector("#site-brand");
 const updateBanner = document.querySelector("#update-banner");
 const updateReloadButton = document.querySelector("#update-reload");
+const downloadAppButton = document.querySelector("#download-app");
+const downloadAppLabel = document.querySelector("#download-app-label");
 
 let manifest;
 let state;
@@ -1412,8 +1414,29 @@ function updatePanelSelection(panelState) {
     const verse = Number(group.dataset.verse);
     group.classList.toggle("selected", Boolean(bounds && verse >= bounds[0] && verse <= bounds[1]));
   });
+  elements.panel.classList.toggle("selection-active", Boolean(bounds));
   elements.copy.hidden = !bounds;
   elements.cancelSelection.hidden = !bounds;
+}
+
+// The floating copy/cancel buttons overlap the bottom edge of the reading
+// area, so a verse tapped near the bottom is nudged up just far enough to
+// clear them (.verse-group's scroll-margin-bottom sets the clearance).
+function revealVerseAboveActions(panelState, verse) {
+  const elements = panelElements.get(panelState.id);
+  const group = elements?.content.querySelector(`.verse-group[data-verse="${verse}"]`);
+  if (!group) return;
+  const contentRect = elements.content.getBoundingClientRect();
+  const groupRect = group.getBoundingClientRect();
+  const clearance = Number.parseFloat(getComputedStyle(group).scrollMarginBottom) || 0;
+  const overlap = groupRect.bottom - (contentRect.bottom - clearance);
+  if (overlap <= 0) return;
+  // A verse taller than the panel keeps its start in view instead.
+  const maxUpward = Math.max(0, groupRect.top - contentRect.top - 8);
+  elements.content.scrollBy({
+    top: Math.min(overlap, maxUpward),
+    behavior: reducedMotion.matches ? "auto" : "smooth",
+  });
 }
 
 function clearPanelSelection(panelState) {
@@ -1439,6 +1462,7 @@ function selectVerse(panelState, verse) {
     panelState.selectionEnd = verse;
   }
   updatePanelSelection(panelState);
+  if (selectionBounds(panelState)) revealVerseAboveActions(panelState, verse);
 }
 
 async function loadPanel(panelState, targetVerse = null) {
@@ -1466,6 +1490,42 @@ async function loadPanel(panelState, targetVerse = null) {
   } catch (error) {
     elements.content.innerHTML = `<div class="panel-message error">${escapeHtml(error.message)}<br />Use a local HTTP server when previewing.</div>`;
   }
+}
+
+// Re-rendering replaces the verse nodes while scrollTop stays put, so when
+// row heights change (enabling another translation, switching layouts) the
+// reader loses their place. Anchor on a visible selected verse when there is
+// one, else the verse nearest the panel's vertical center, and restore its
+// on-screen position after the swap.
+function captureVerseAnchor(content, panelState) {
+  const contentRect = content.getBoundingClientRect();
+  if (!contentRect.height) return null;
+  const bounds = selectionBounds(panelState);
+  const middle = contentRect.top + contentRect.height / 2;
+  let anchor = null;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (const group of content.querySelectorAll(".verse-group")) {
+    const rect = group.getBoundingClientRect();
+    if (rect.bottom <= contentRect.top || rect.top >= contentRect.bottom) continue;
+    const verse = Number(group.dataset.verse);
+    if (bounds && verse >= bounds[0] && verse <= bounds[1]) {
+      return { verse, offset: rect.top - contentRect.top };
+    }
+    const distance = Math.abs((rect.top + rect.bottom) / 2 - middle);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      anchor = { verse, offset: rect.top - contentRect.top };
+    }
+  }
+  return anchor;
+}
+
+function restoreVerseAnchor(content, anchor) {
+  if (!anchor) return;
+  const group = content.querySelector(`.verse-group[data-verse="${anchor.verse}"]`);
+  if (!group) return;
+  const drift = group.getBoundingClientRect().top - content.getBoundingClientRect().top - anchor.offset;
+  if (Math.abs(drift) > 1) content.scrollTop += drift;
 }
 
 function renderPanelBody(panelState) {
@@ -1530,7 +1590,9 @@ function renderPanelBody(panelState) {
     fragment.append(group);
   }
 
+  const anchor = captureVerseAnchor(elements.content, panelState);
   elements.content.replaceChildren(fragment);
+  restoreVerseAnchor(elements.content, anchor);
   updatePanelSelection(panelState);
   updatePanelControls(panelState);
 }
@@ -1711,7 +1773,6 @@ function buildCopyText(panelState, translations, order) {
     const bookName = bookNameFor(translations[0]);
     const translationNames = translations.map((translation) => translationMeta(translation).label).join("-");
     lines.push(`${bookName} ${range}, ${translationNames}`);
-    lines.push("");
     for (const [verse, texts] of verses) {
       for (const translation of translations) {
         if (texts[translation]) lines.push(`${verse} ${texts[translation]}`);
@@ -1996,6 +2057,125 @@ async function checkForUpdate() {
     // Offline or blocked request; the next scheduled check will retry.
   }
 }
+
+// ---- Offline install ----
+// The service worker mirrors every successful same-origin response into the
+// offline cache; the header install button (desktop only) additionally
+// triggers the browser's "install app" prompt and bulk-downloads the whole
+// Bible (all chapters + search indexes) so the app keeps working with no
+// network at all.
+const OFFLINE_CACHE = "bible-offline-v1";
+const OFFLINE_READY_KEY = "side-by-side-bible:offline-build";
+let installPromptEvent = null;
+let offlineDownloadInProgress = false;
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch(() => {});
+  });
+}
+
+window.addEventListener("beforeinstallprompt", (event) => {
+  event.preventDefault();
+  installPromptEvent = event;
+});
+
+function offlineReady() {
+  return localStorage.getItem(OFFLINE_READY_KEY) === ASSET_VERSION;
+}
+
+function updateDownloadButton() {
+  if (offlineDownloadInProgress) return;
+  downloadAppLabel.textContent = offlineReady() ? "Offline ✓" : "Install";
+}
+
+function offlineUrls() {
+  const urls = [
+    "./",
+    "./index.html",
+    `./styles.css?v=${ASSET_VERSION}`,
+    `./app.js?v=${ASSET_VERSION}`,
+    `./search-worker.js?v=${ASSET_VERSION}`,
+    "./manifest.webmanifest",
+    "./icons/icon-192.png",
+    "./icons/icon-512.png",
+    `./data/manifest.json?v=${ASSET_VERSION}`,
+  ];
+  for (const translation of manifest.translations) {
+    urls.push(`./data/search/${translation.id}.json?v=${ASSET_VERSION}`);
+  }
+  manifest.books.forEach((book, bookIndex) => {
+    for (let chapter = 1; chapter <= book.chapters; chapter += 1) {
+      urls.push(chapterPath(bookIndex, chapter));
+    }
+  });
+  return urls;
+}
+
+async function cacheOfflineContent() {
+  const cache = await caches.open(OFFLINE_CACHE);
+  const urls = offlineUrls();
+  let done = 0;
+  let failed = 0;
+  const queue = [...urls];
+  const workers = Array.from({ length: 6 }, async () => {
+    while (queue.length) {
+      const url = queue.shift();
+      try {
+        // Data URLs are versioned by ?v=, so an existing exact match is
+        // current and a re-download (or a retry pass) can skip it. The
+        // small unversioned shell files are always refreshed.
+        if (!url.includes("/data/") || !(await cache.match(url))) {
+          const response = await fetch(url, { cache: "no-store" });
+          if (!response.ok) throw new Error(String(response.status));
+          await cache.delete(url, { ignoreSearch: true });
+          await cache.put(url, response);
+        }
+      } catch {
+        failed += 1;
+      }
+      done += 1;
+      if (done % 10 === 0 || done === urls.length) {
+        downloadAppLabel.textContent = `${Math.round((done / urls.length) * 100)}%`;
+      }
+    }
+  });
+  await Promise.all(workers);
+  return failed;
+}
+
+async function downloadOfflineApp() {
+  if (offlineDownloadInProgress || !manifest) return;
+  if (installPromptEvent) {
+    const prompt = installPromptEvent;
+    installPromptEvent = null;
+    prompt.prompt();
+    await prompt.userChoice.catch(() => {});
+  }
+  if (!("caches" in window)) {
+    downloadAppLabel.textContent = "Unsupported";
+    return;
+  }
+  offlineDownloadInProgress = true;
+  downloadAppButton.disabled = true;
+  try {
+    const failed = await cacheOfflineContent();
+    if (failed) {
+      downloadAppLabel.textContent = "Retry";
+    } else {
+      localStorage.setItem(OFFLINE_READY_KEY, ASSET_VERSION);
+    }
+  } catch {
+    downloadAppLabel.textContent = "Retry";
+  } finally {
+    offlineDownloadInProgress = false;
+    downloadAppButton.disabled = false;
+    if (offlineReady()) downloadAppLabel.textContent = "Offline ✓";
+  }
+}
+
+downloadAppButton.addEventListener("click", downloadOfflineApp);
+updateDownloadButton();
 
 updateReloadButton.addEventListener("click", () => window.location.reload());
 document.addEventListener("visibilitychange", () => {
