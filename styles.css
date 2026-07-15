@@ -2020,7 +2020,7 @@ body * {
     grid-template-rows: 34px 35px;
     grid-template-areas:
       "brand font actions"
-      "translations translations translations";
+      "translations translations verse";
     align-items: center;
     gap: 4px 6px;
   }
@@ -2867,10 +2867,18 @@ body * {
   stroke-width: 1.7;
 }
 
+/* Touch layouts hide the panel-count control in portrait (one panel per
+   screen there), but the verse layout toggle stays available everywhere:
+   portrait places it at the end of the translations row. */
 @media (max-width: 820px), (max-width: 1366px) and (any-pointer: coarse) {
-  .verse-layout-control,
   .panel-count-control {
     display: none;
+  }
+
+  .verse-layout-control {
+    grid-area: verse;
+    display: flex;
+    justify-self: end;
   }
 }
 
@@ -3001,16 +3009,32 @@ html[data-verse-layout="columns"] .translation-label {
   stroke-linejoin: round;
 }
 
-/* On touch layouts the other header buttons are icon-only; the install
-   button keeps a compact text label so download progress stays visible. */
+.download-app:disabled {
+  opacity: 0.4;
+  cursor: default;
+  pointer-events: none;
+}
+
+/* Touch layouts: icon-only install button; the text label (download
+   progress) only appears while a download is running. */
 @media (max-width: 820px), (max-width: 1366px) and (any-pointer: coarse) {
   .header-actions .download-app {
-    width: auto;
-    padding: 0 7px;
+    width: 36px;
+    padding: 0;
     font-size: 0;
   }
 
   .header-actions .download-app span {
+    display: none;
+  }
+
+  .header-actions .download-app.downloading {
+    width: auto;
+    padding: 0 7px;
+  }
+
+  .header-actions .download-app.downloading span {
+    display: inline;
     font-size: 10px;
     font-weight: 700;
     line-height: 1;

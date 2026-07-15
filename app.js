@@ -142,27 +142,17 @@ function enabledTranslationIds() {
   return state.translationOrder.filter((id) => state.enabledTranslations.includes(id));
 }
 
-function canUseColumnVerseLayout() {
-  if (!state) return false;
-  if (!mobileLayout.matches) return true;
-  return touchPanelToggleLayout.matches && state.touchPanelCount === 1;
-}
-
 function effectiveVerseLayout() {
-  return state?.verseLayout === "columns" && canUseColumnVerseLayout() ? "columns" : "stacked";
+  return state?.verseLayout === "columns" ? "columns" : "stacked";
 }
 
 function updateVerseLayoutControls() {
   if (!state) return;
   const effectiveLayout = effectiveVerseLayout();
-  const columnsAllowed = canUseColumnVerseLayout();
-  const controlsDisabled = isTwoPanelTouchMode();
   verseLayoutStackedButton.classList.toggle("selected", effectiveLayout === "stacked");
   verseLayoutColumnsButton.classList.toggle("selected", effectiveLayout === "columns");
   verseLayoutStackedButton.setAttribute("aria-pressed", String(effectiveLayout === "stacked"));
   verseLayoutColumnsButton.setAttribute("aria-pressed", String(effectiveLayout === "columns"));
-  verseLayoutStackedButton.disabled = controlsDisabled;
-  verseLayoutColumnsButton.disabled = controlsDisabled || !columnsAllowed;
 }
 
 function applyVerseLayout(refresh = true) {
@@ -174,7 +164,6 @@ function applyVerseLayout(refresh = true) {
 
 function setVerseLayout(layout) {
   if (layout !== "stacked" && layout !== "columns") return;
-  if (layout === "columns" && !canUseColumnVerseLayout()) return;
   state.verseLayout = layout;
   saveState();
   applyVerseLayout();
@@ -2104,7 +2093,12 @@ function offlineReady() {
 
 function updateDownloadButton() {
   if (offlineDownloadInProgress) return;
-  downloadAppLabel.textContent = offlineReady() ? "Offline ✓" : "Install";
+  const ready = offlineReady();
+  downloadAppButton.disabled = ready;
+  downloadAppButton.title = ready
+    ? "Everything is already downloaded for offline use"
+    : "Install as an app and download everything for offline use";
+  downloadAppLabel.textContent = "Install";
 }
 
 function offlineUrls() {
@@ -2179,6 +2173,7 @@ async function downloadOfflineApp() {
   }
   offlineDownloadInProgress = true;
   downloadAppButton.disabled = true;
+  downloadAppButton.classList.add("downloading");
   try {
     const failed = await cacheOfflineContent();
     if (failed) {
@@ -2190,8 +2185,13 @@ async function downloadOfflineApp() {
     downloadAppLabel.textContent = "Retry";
   } finally {
     offlineDownloadInProgress = false;
-    downloadAppButton.disabled = false;
-    if (offlineReady()) downloadAppLabel.textContent = "Offline ✓";
+    downloadAppButton.classList.remove("downloading");
+    if (offlineReady()) {
+      // Same icon as before the download; the button is simply disabled.
+      updateDownloadButton();
+    } else {
+      downloadAppButton.disabled = false;
+    }
   }
 }
 
