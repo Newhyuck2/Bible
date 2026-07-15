@@ -2016,11 +2016,11 @@ body * {
     display: grid;
     width: 100%;
     height: 100%;
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
     grid-template-rows: 34px 35px;
     grid-template-areas:
-      "brand font actions"
-      "translations translations verse";
+      "brand verse font actions"
+      "translations translations translations translations";
     align-items: center;
     gap: 4px 6px;
   }
@@ -2032,6 +2032,14 @@ body * {
   .site-brand > span:last-child {
     display: inline;
     font-size: 11px;
+  }
+
+  /* Narrow phones: the top row now also holds the layout toggle, so the
+     brand text yields to keep everything on screen. */
+  @media (max-width: 430px) {
+    .site-brand > span:last-child {
+      display: none;
+    }
   }
 
   .site-cross {
@@ -2995,6 +3003,7 @@ html[data-verse-layout="columns"] .translation-label {
 .download-app {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 5px;
 }
 
