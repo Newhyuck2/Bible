@@ -15,9 +15,11 @@ OUTPUT = ROOT / "data"
 TRANSLATIONS = [
     {"id": "ESV", "label": "ESV", "name": "English Standard Version"},
     {"id": "NIV", "label": "NIV", "name": "New International Version"},
+    {"id": "KJV", "label": "KJV", "name": "King James Version"},
     {"id": "GAE", "label": "개역개정", "name": "Korean Revised Version"},
     {"id": "SAENEW", "label": "새번역", "name": "Korean New Translation"},
     {"id": "WLB", "label": "우리말", "name": "Woorimal Bible"},
+    {"id": "CNV", "label": "新译本", "name": "Chinese New Version"},
 ]
 
 KOREAN_BOOK_NAMES = [

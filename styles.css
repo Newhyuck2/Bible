@@ -1648,12 +1648,20 @@ body * {
   font-family: "Segoe UI", sans-serif !important;
 }
 
+[lang="zh"] {
+  font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif !important;
+}
+
 :lang(ko) {
   font-family: "Malgun Gothic", sans-serif !important;
 }
 
 :lang(en) {
   font-family: "Segoe UI", sans-serif !important;
+}
+
+:lang(zh) {
+  font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif !important;
 }
 
 .site-brand {

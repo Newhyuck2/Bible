@@ -2,9 +2,11 @@ const STORAGE_KEY = "side-by-side-bible:v1";
 const TRANSLATION_COLORS = {
   ESV: "#9b5c34",
   NIV: "#476f9b",
+  KJV: "#79652f",
   GAE: "#2f7663",
   SAENEW: "#805692",
   WLB: "#a24f62",
+  CNV: "#5d5fa0",
 };
 const ASSET_VERSION = document.querySelector('meta[name="asset-version"]').content;
 const MOBILE_LAYOUT_QUERY = "(max-width: 820px), (max-width: 1366px) and (any-pointer: coarse)";
@@ -67,7 +69,7 @@ const searchWorker = new Worker(`./search-worker.js?v=${ASSET_VERSION}`);
 
 function freshState() {
   return {
-    translationOrder: ["ESV", "NIV", "GAE", "SAENEW", "WLB"],
+    translationOrder: ["ESV", "NIV", "KJV", "GAE", "SAENEW", "WLB", "CNV"],
     enabledTranslations: ["ESV", "NIV", "GAE"],
     fontSize: 14,
     touchPanelCount: null,
@@ -325,7 +327,8 @@ function translationMeta(id) {
 }
 
 function translationLanguage(id) {
-  return id === "ESV" || id === "NIV" ? "en" : "ko";
+  if (id === "CNV") return "zh";
+  return id === "ESV" || id === "NIV" || id === "KJV" ? "en" : "ko";
 }
 
 function renderTranslationControls() {
