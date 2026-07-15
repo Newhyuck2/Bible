@@ -2034,12 +2034,10 @@ body * {
     font-size: 11px;
   }
 
-  /* Narrow phones: the top row now also holds the layout toggle, so the
-     brand text yields to keep everything on screen. */
-  @media (max-width: 430px) {
-    .site-brand > span:last-child {
-      display: none;
-    }
+  /* The script adds this class only when the top row would otherwise
+     overlap the brand text (see updateBrandLabelVisibility). */
+  body.brand-label-hidden .site-brand > span:last-child {
+    display: none;
   }
 
   .site-cross {

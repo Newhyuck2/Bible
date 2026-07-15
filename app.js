@@ -542,6 +542,36 @@ mobileLayout.addEventListener("change", () => {
   syncTrackFreeScroll();
 });
 
+// The portrait two-row header keeps the "Holy Bible" label only while it
+// fits. The layout toggle sits in the flexible column of the top row, so
+// when space runs out it is the first thing pushed into the brand: that
+// overlap is the signal to drop the label (and re-measure on every resize
+// so it comes back as soon as it fits again).
+const brandLabel = siteBrand.querySelector("span:last-child");
+const verseLayoutControl = verseLayoutStackedButton.closest(".verse-layout-control");
+
+function updateBrandLabelVisibility() {
+  if (!brandLabel) return;
+  document.body.classList.remove("brand-label-hidden");
+  if (!mobileLayout.matches || touchPanelToggleLayout.matches) return;
+  const brandRect = siteBrand.getBoundingClientRect();
+  const toggleRect = verseLayoutControl.getBoundingClientRect();
+  if (toggleRect.left < brandRect.right + 2) {
+    document.body.classList.add("brand-label-hidden");
+  }
+}
+
+let brandLabelFrame = 0;
+function scheduleBrandLabelUpdate() {
+  window.cancelAnimationFrame(brandLabelFrame);
+  brandLabelFrame = window.requestAnimationFrame(updateBrandLabelVisibility);
+}
+
+window.addEventListener("resize", scheduleBrandLabelUpdate);
+mobileLayout.addEventListener("change", scheduleBrandLabelUpdate);
+touchPanelToggleLayout.addEventListener("change", scheduleBrandLabelUpdate);
+scheduleBrandLabelUpdate();
+
 // On desktop, wheel scrolling anywhere outside the reading surface — the app
 // header bar, each panel's header bar, and the empty strips around the panels
 // — pans the panel track. Wheel ticks arrive in coarse jumps, so instead of
