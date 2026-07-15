@@ -2477,7 +2477,8 @@ body * {
   }
 }
 
-.update-banner {
+.update-banner,
+.install-hint {
   position: fixed;
   left: 50%;
   bottom: 20px;
@@ -2495,11 +2496,18 @@ body * {
   transform: translate(-50%, 0);
 }
 
-.update-banner[hidden] {
+.install-hint {
+  max-width: min(92vw, 420px);
+  line-height: 1.45;
+}
+
+.update-banner[hidden],
+.install-hint[hidden] {
   display: none;
 }
 
-.update-banner button {
+.update-banner button,
+.install-hint button {
   padding: 7px 13px;
   border: 0;
   border-radius: 8px;
@@ -2509,7 +2517,13 @@ body * {
   font-weight: 800;
 }
 
-.update-banner button:hover {
+.install-hint button {
+  flex: none;
+  padding: 5px 11px;
+}
+
+.update-banner button:hover,
+.install-hint button:hover {
   background: var(--accent-hover);
 }
 
@@ -2596,11 +2610,18 @@ body * {
   }
 }
 
-/* Translation order is changed by dragging the entire chip. */
-.translation-chip,
+/* Translation order: a mouse can drag the whole chip; on touch the drag
+   starts on the ⠿ handle, so a swipe on the chip body scrolls the list
+   (with many translations the header row overflows on phones). */
+.translation-chip {
+  cursor: grab;
+  touch-action: pan-x;
+  user-select: none;
+}
+
 .copy-translation-option {
   cursor: grab;
-  touch-action: none;
+  touch-action: pan-y;
   user-select: none;
 }
 
@@ -2612,7 +2633,19 @@ body * {
 .drag-handle,
 .copy-drag-handle {
   flex: 0 0 auto;
-  pointer-events: none;
+  touch-action: none;
+}
+
+/* Bigger handle hit target for fingers. */
+@media (max-width: 820px), (max-width: 1366px) and (any-pointer: coarse) {
+  .drag-handle,
+  .copy-drag-handle {
+    display: inline-flex;
+    width: 24px;
+    height: 28px;
+    align-items: center;
+    justify-content: center;
+  }
 }
 
 .move-buttons,
@@ -2950,7 +2983,7 @@ html[data-verse-layout="columns"] .translation-label {
   }
 }
 
-/* Offline install button (desktop only). */
+/* Offline install button. */
 .download-app {
   display: inline-flex;
   align-items: center;
@@ -2968,8 +3001,18 @@ html[data-verse-layout="columns"] .translation-label {
   stroke-linejoin: round;
 }
 
+/* On touch layouts the other header buttons are icon-only; the install
+   button keeps a compact text label so download progress stays visible. */
 @media (max-width: 820px), (max-width: 1366px) and (any-pointer: coarse) {
-  .download-app {
-    display: none !important;
+  .header-actions .download-app {
+    width: auto;
+    padding: 0 7px;
+    font-size: 0;
+  }
+
+  .header-actions .download-app span {
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
   }
 }

@@ -53,6 +53,8 @@ const updateBanner = document.querySelector("#update-banner");
 const updateReloadButton = document.querySelector("#update-reload");
 const downloadAppButton = document.querySelector("#download-app");
 const downloadAppLabel = document.querySelector("#download-app-label");
+const installHint = document.querySelector("#install-hint");
+const installHintClose = document.querySelector("#install-hint-close");
 
 let manifest;
 let state;
@@ -354,6 +356,7 @@ function renderTranslationControls() {
     handle.setAttribute("aria-hidden", "true");
     setupTouchReorder({
       item: chip,
+      handle,
       container: translationList,
       itemClass: "translation-chip",
       id,
@@ -422,8 +425,9 @@ function moveTranslation(from, to) {
 // input, so touch reordering is driven by Pointer Events instead: the dragged
 // item is lifted with a transform, elementFromPoint finds the item underneath
 // the finger, and the swap only happens once on release (mirroring the mouse
-// drop handler above).
-function setupTouchReorder({ item, container, itemClass, id, getOrder, onReorder }) {
+// drop handler above). Touch drags start only on the ⠿ handle so that a swipe
+// on the item body stays a native scroll of the surrounding list.
+function setupTouchReorder({ item, handle, container, itemClass, id, getOrder, onReorder }) {
   let suppressClick = false;
 
   item.addEventListener("click", (event) => {
@@ -435,6 +439,7 @@ function setupTouchReorder({ item, container, itemClass, id, getOrder, onReorder
 
   item.addEventListener("pointerdown", (event) => {
     if (event.pointerType !== "touch") return;
+    if (handle && !handle.contains(event.target)) return;
     const pointerId = event.pointerId;
     const startX = event.clientX;
     const startY = event.clientY;
@@ -1671,6 +1676,7 @@ function renderCopyTranslationOptions(checkedTranslations = null) {
     handle.title = "Drag to reorder";
     setupTouchReorder({
       item,
+      handle,
       container: copyTranslations,
       itemClass: "copy-translation-option",
       id: translation,
@@ -2063,14 +2069,23 @@ async function checkForUpdate() {
 
 // ---- Offline install ----
 // The service worker mirrors every successful same-origin response into the
-// offline cache; the header install button (desktop only) additionally
-// triggers the browser's "install app" prompt and bulk-downloads the whole
-// Bible (all chapters + search indexes) so the app keeps working with no
-// network at all.
+// offline cache; the header install button additionally triggers the
+// browser's "install app" prompt (Chrome/Edge on desktop and Android) and
+// bulk-downloads the whole Bible (all chapters + search indexes) so the app
+// keeps working with no network at all. iOS has no install prompt API, so a
+// hint explains Share → Add to Home Screen while the download proceeds.
 const OFFLINE_CACHE = "bible-offline-v1";
 const OFFLINE_READY_KEY = "side-by-side-bible:offline-build";
 let installPromptEvent = null;
 let offlineDownloadInProgress = false;
+
+const IOS_DEVICE = /iPhone|iPad|iPod/.test(navigator.userAgent)
+  || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+function runningStandalone() {
+  return window.matchMedia("(display-mode: standalone)").matches
+    || window.navigator.standalone === true;
+}
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
@@ -2100,6 +2115,7 @@ function offlineUrls() {
     `./app.js?v=${ASSET_VERSION}`,
     `./search-worker.js?v=${ASSET_VERSION}`,
     "./manifest.webmanifest",
+    "./icons/icon-180.png",
     "./icons/icon-192.png",
     "./icons/icon-512.png",
     `./data/manifest.json?v=${ASSET_VERSION}`,
@@ -2154,6 +2170,8 @@ async function downloadOfflineApp() {
     installPromptEvent = null;
     prompt.prompt();
     await prompt.userChoice.catch(() => {});
+  } else if (IOS_DEVICE && !runningStandalone()) {
+    installHint.hidden = false;
   }
   if (!("caches" in window)) {
     downloadAppLabel.textContent = "Unsupported";
@@ -2178,6 +2196,9 @@ async function downloadOfflineApp() {
 }
 
 downloadAppButton.addEventListener("click", downloadOfflineApp);
+installHintClose.addEventListener("click", () => {
+  installHint.hidden = true;
+});
 updateDownloadButton();
 
 updateReloadButton.addEventListener("click", () => window.location.reload());
