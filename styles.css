@@ -1421,7 +1421,7 @@ mark {
 .combo-input {
   width: 100%;
   height: 36px;
-  padding: 0 10px;
+  padding: 0 24px 0 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
   outline: none;
@@ -1434,6 +1434,22 @@ mark {
 
 .combo-input:focus {
   cursor: text;
+}
+
+/* A small triangle marks the box as a dropdown. It is decoration only:
+   pointer-events pass straight through to the input underneath. */
+.combo::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 9px;
+  width: 0;
+  height: 0;
+  margin-top: -2px;
+  border-right: 4px solid transparent;
+  border-left: 4px solid transparent;
+  border-top: 5px solid var(--muted);
+  pointer-events: none;
 }
 
 .combo-menu {
@@ -2050,7 +2066,7 @@ body * {
   }
 
   .compact-toolbar .translation-list {
-    flex: 1 1 auto;
+    flex: 0 1 auto;
     min-width: 0;
     margin: 0;
     padding: 1px 0 2px;
@@ -2108,18 +2124,12 @@ body * {
     overflow-y: hidden;
     overscroll-behavior-x: contain;
     scroll-padding-inline: 6px;
-    scroll-snap-type: x mandatory;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
   }
 
   .bible-panel {
-    flex: 0 0 calc(100vw - 12px);
-    flex-basis: calc(100vw - 12px) !important;
-    width: calc(100vw - 12px);
     height: 100%;
-    scroll-snap-align: center;
-    scroll-snap-stop: always;
   }
 
   .panel-header {
@@ -2158,8 +2168,12 @@ body * {
 
   .combo-input {
     height: 34px;
-    padding-inline: 8px;
+    padding: 0 20px 0 8px;
     font-size: 16px;
+  }
+
+  .combo::after {
+    right: 7px;
   }
 
   .combo-menu {
@@ -2433,32 +2447,33 @@ body * {
   white-space: nowrap;
 }
 
-/* A landscape touch device shows two panels and advances one panel per swipe. */
-@media (orientation: landscape) and (max-width: 1366px) and (any-pointer: coarse) {
-  .bible-panel {
-    flex: 0 0 calc((100vw - 20px) / 2);
-    flex-basis: calc((100vw - 20px) / 2) !important;
-    width: calc((100vw - 20px) / 2);
-    scroll-snap-align: start;
+/* Only phones in portrait keep the one-panel pager: full-width panels that
+   snap one per screen. */
+@media (orientation: portrait) and (max-width: 599px) {
+  .panel-track {
+    scroll-snap-type: x mandatory;
   }
-}
 
-/* The saved touch layout overrides the orientation default where the
-   one/two-panel selector is available. Phone portrait stays one panel. */
-@media (orientation: landscape) and (max-width: 1366px) and (any-pointer: coarse),
-  (min-width: 600px) and (max-width: 1366px) and (any-pointer: coarse) {
-  html[data-touch-panel-count="1"] .bible-panel {
+  .bible-panel {
     flex: 0 0 calc(100vw - 12px);
     flex-basis: calc(100vw - 12px) !important;
     width: calc(100vw - 12px);
     scroll-snap-align: center;
+    scroll-snap-stop: always;
+  }
+}
+
+/* Phones in landscape and tablets run the exact desktop panel mechanism:
+   pixel widths from the 1/2/fit presets, free continuous scrolling, and
+   native horizontal panning (a drag on the text pans the track). */
+@media (orientation: landscape) and (max-width: 1366px) and (any-pointer: coarse),
+  (min-width: 600px) and (max-width: 1366px) and (any-pointer: coarse) {
+  .panel-track {
+    scroll-snap-type: none;
   }
 
-  html[data-touch-panel-count="2"] .bible-panel {
-    flex: 0 0 calc((100vw - 20px) / 2);
-    flex-basis: calc((100vw - 20px) / 2) !important;
-    width: calc((100vw - 20px) / 2);
-    scroll-snap-align: start;
+  .panel-content {
+    touch-action: auto;
   }
 }
 
@@ -2900,11 +2915,6 @@ body * {
     background: white;
   }
 
-  /* Splitting the screen among visible panels is a desktop-only action. */
-  .panel-count-control #panel-fit-visible {
-    display: none;
-  }
-
   .verse-layout-control {
     grid-area: verse;
     display: flex;
@@ -3020,6 +3030,19 @@ html[data-verse-layout="columns"] .translation-label {
   line-height: 1;
 }
 
+/* SVG glyphs sit dead-center in the icon squares (text glyphs like ⌕ and
+   ＋ drift with the font's baseline). */
+#open-search svg,
+#add-panel svg {
+  display: block;
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
 .header-actions .download-app span {
   display: none;
 }
@@ -3052,8 +3075,6 @@ html[data-verse-layout="columns"] .translation-label {
   border-radius: 8px;
   background: white;
   color: var(--ink);
-  font-size: 11px;
-  font-weight: 800;
   white-space: nowrap;
   touch-action: none;
 }
@@ -3065,13 +3086,17 @@ html[data-verse-layout="columns"] .translation-label {
 
 .translation-picker-toggle .picker-plus {
   color: var(--accent);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 900;
+  line-height: 1;
 }
 
 .translation-picker-toggle .picker-caret {
-  margin-top: -4px;
-  color: var(--muted);
+  width: 0;
+  height: 0;
+  border-right: 4px solid transparent;
+  border-left: 4px solid transparent;
+  border-top: 5px solid var(--muted);
 }
 
 .translation-picker-toggle[aria-expanded="true"] {

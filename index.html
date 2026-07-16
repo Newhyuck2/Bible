@@ -8,7 +8,7 @@
     />
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta name="description" content="A compact multi-panel Bible reader" />
-    <meta name="asset-version" content="20260716-2" />
+    <meta name="asset-version" content="20260716-3" />
     <meta name="theme-color" content="#284f43" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -17,7 +17,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" type="image/png" href="./icons/icon-192.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="./icons/icon-180.png" />
-    <link rel="stylesheet" href="./styles.css?v=20260716-2" />
+    <link rel="stylesheet" href="./styles.css?v=20260716-3" />
   </head>
   <body>
     <header class="app-header"> 
@@ -38,6 +38,7 @@
           <span>Holy Bible</span>
         </div>
         <div class="translation-controls" id="translation-controls">
+          <div class="translation-list" id="translation-list" aria-label="Selected versions"></div>
           <div class="translation-picker" id="translation-picker">
             <button
               class="translation-picker-toggle"
@@ -45,21 +46,20 @@
               type="button"
               aria-haspopup="listbox"
               aria-expanded="false"
-              title="Choose translations"
+              aria-label="Add version"
+              title="Add version"
             >
               <span class="picker-plus" aria-hidden="true">＋</span>
-              <span>Versions</span>
-              <span class="picker-caret" aria-hidden="true">⌄</span>
+              <span class="picker-caret" aria-hidden="true"></span>
             </button>
             <div
               class="translation-picker-menu"
               id="translation-picker-menu"
               role="listbox"
-              aria-label="Available translations"
+              aria-label="Available versions"
               hidden
             ></div>
           </div>
-          <div class="translation-list" id="translation-list" aria-label="Selected translations"></div>
         </div>
         <div class="verse-layout-control" role="group" aria-label="Verse translation layout">
           <button id="verse-layout-stacked" type="button" aria-label="Stack translations vertically" aria-pressed="false">
@@ -112,10 +112,15 @@
             <span id="download-app-label">Install</span>
           </button>
           <button class="button button-secondary" id="open-search" type="button" aria-label="Search Bible" title="Search Bible">
-            <span aria-hidden="true">⌕</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="11" cy="11" r="6.3"></circle>
+              <path d="m15.7 15.7 4.6 4.6"></path>
+            </svg>
           </button>
           <button class="button button-primary" id="add-panel" type="button" aria-label="Add Bible panel" title="Add Bible panel">
-            <span aria-hidden="true">＋</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 5v14M5 12h14"></path>
+            </svg>
           </button>
         </div>
       </div>
@@ -275,6 +280,6 @@
     </div>
 
     <noscript>JavaScript is required to display the Bible text.</noscript>
-    <script type="module" src="./app.js?v=20260716-2"></script>
+    <script type="module" src="./app.js?v=20260716-3"></script>
   </body>
 </html>

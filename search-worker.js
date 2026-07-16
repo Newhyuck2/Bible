@@ -1,6 +1,6 @@
 const cache = new Map();
 const MAX_MATCHES_PER_TRANSLATION_PER_BOOK = 25;
-const ASSET_VERSION = "20260716-2";
+const ASSET_VERSION = "20260716-3";
 
 async function loadTranslation(translation) {
   if (cache.has(translation)) return cache.get(translation);

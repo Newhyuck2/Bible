@@ -81,7 +81,7 @@ const searchWorker = new Worker(`./search-worker.js?v=${ASSET_VERSION}`);
 
 function freshState() {
   return {
-    enabledTranslations: ["ESV", "NIV", "GAE"],
+    enabledTranslations: ["NIV", "GAE"],
     fontSize: 14,
     touchPanelCount: null,
     desktopPanelMode: null,
@@ -144,8 +144,17 @@ function saveState() {
   );
 }
 
+// Phones in landscape and tablets use the exact desktop panel mechanism
+// (pixel widths, free scrolling, the 1/2/fit presets); only phone portrait
+// keeps the one-panel pager.
+function desktopLikePanels() {
+  return !mobileLayout.matches || touchPanelToggleLayout.matches;
+}
+
+// Touch layouts running the two-panel desktop preset keep the long-press
+// panel swap (the hover move buttons need a mouse).
 function isTwoPanelTouchMode() {
-  return Boolean(state && touchPanelToggleLayout.matches && state.touchPanelCount === 2);
+  return Boolean(state && touchPanelToggleLayout.matches && state.desktopPanelMode === 2);
 }
 
 function enabledTranslationIds() {
@@ -181,7 +190,7 @@ function setVerseLayout(layout) {
 
 function updatePanelCountControls() {
   if (!state) return;
-  const desktop = !mobileLayout.matches;
+  const desktop = desktopLikePanels();
   const oneSelected = desktop ? state.desktopPanelMode === 1 : state.touchPanelCount === 1;
   const twoSelected = desktop ? state.desktopPanelMode === 2 : state.touchPanelCount !== 1;
   panelCountOneButton.classList.toggle("selected", oneSelected);
@@ -252,7 +261,7 @@ function visiblePanelSpan() {
 // Give every panel an equal share of one screen, sized so exactly the panels
 // that were on screen (clipped ones included) fill it edge to edge.
 function fitVisiblePanels() {
-  if (mobileLayout.matches || state.panels.length < 3) return;
+  if (!desktopLikePanels() || state.panels.length < 3) return;
   const { first, count } = visiblePanelSpan();
   setAllDesktopPanelWidths(desktopPanelFitWidth(count));
   clearDesktopPanelMode();
@@ -307,7 +316,7 @@ function resetSite() {
   panelElements.clear();
   state = freshState();
   sanitizeState();
-  if (!mobileLayout.matches) {
+  if (desktopLikePanels()) {
     state.panels[0].width = desktopPanelFitWidth(2);
   }
   applyTouchPanelCount();
@@ -473,6 +482,7 @@ function renderTranslationPickerMenu() {
         if (state.enabledTranslations.includes(id)) removeTranslation(id);
         else addTranslation(id);
         renderTranslationPickerMenu();
+        positionTranslationPickerMenu();
       });
       option.append(label, name);
       section.append(option);
@@ -481,10 +491,23 @@ function renderTranslationPickerMenu() {
   }
 }
 
+// The + button travels with the chip row, so slide the dropdown along the
+// button's edge as far as needed to keep the whole menu on screen.
+function positionTranslationPickerMenu() {
+  if (translationPickerMenu.hidden) return;
+  translationPickerMenu.style.right = "auto";
+  translationPickerMenu.style.left = "0";
+  const width = translationPickerMenu.getBoundingClientRect().width;
+  const anchor = translationPicker.getBoundingClientRect();
+  const left = Math.max(8, Math.min(anchor.left, window.innerWidth - width - 8));
+  translationPickerMenu.style.left = `${left - anchor.left}px`;
+}
+
 function openTranslationPicker() {
   if (!translationPickerMenu.hidden) return;
   renderTranslationPickerMenu();
   translationPickerMenu.hidden = false;
+  positionTranslationPickerMenu();
   translationPickerToggle.setAttribute("aria-expanded", "true");
 }
 
@@ -727,7 +750,7 @@ function matchesBook(item, query) {
 }
 
 function syncTrackFreeScroll() {
-  panelTrack.classList.toggle("free-scroll", !mobileLayout.matches);
+  panelTrack.classList.toggle("free-scroll", desktopLikePanels());
 }
 syncTrackFreeScroll();
 
@@ -873,7 +896,7 @@ document.addEventListener(
 // widths follow the window when it is resized.
 let desktopModeResizeTimer = 0;
 window.addEventListener("resize", () => {
-  if (mobileLayout.matches || !state?.desktopPanelMode) return;
+  if (!desktopLikePanels() || !state?.desktopPanelMode) return;
   window.clearTimeout(desktopModeResizeTimer);
   desktopModeResizeTimer = window.setTimeout(() => {
     applyDesktopPanelWidths();
@@ -1086,7 +1109,9 @@ function setupPanelSwipe(panel, content) {
       document.body.classList.remove("swiping-panels");
       return;
     }
-    if (!mobileLayout.matches || state.panels.length < 2) return;
+    // Only phone portrait pages one panel per swipe; desktop-like layouts
+    // scroll the track natively and continuously.
+    if (desktopLikePanels() || !mobileLayout.matches || state.panels.length < 2) return;
     const touch = event.touches[0];
     gesture = {
       touchId: touch.identifier,
@@ -1243,9 +1268,9 @@ function createPanelElement(panelState, shouldScroll = false) {
   panelState.selectionAnchor = null;
   panelState.selectionEnd = null;
   if (panelState.width) {
-    const renderedWidth = mobileLayout.matches
-      ? panelState.width
-      : Math.min(panelState.width, maximumPanelWidth());
+    const renderedWidth = desktopLikePanels()
+      ? Math.min(panelState.width, maximumPanelWidth())
+      : panelState.width;
     panel.style.flexBasis = `${renderedWidth}px`;
   }
   panel.addEventListener("pointerdown", () => setActivePanel(id));
@@ -2291,7 +2316,7 @@ async function init() {
     applyFontSize();
     renderTranslationControls();
     for (const panel of state.panels) createPanelElement(panel);
-    if (!mobileLayout.matches) applyDesktopPanelWidths();
+    if (desktopLikePanels()) applyDesktopPanelWidths();
     saveState();
   } catch (error) {
     panelTrack.innerHTML = `<div class="panel-message error">Could not start the site: ${escapeHtml(error.message)}<br />Use a local HTTP server when previewing.</div>`;
@@ -2306,12 +2331,12 @@ siteBrand.addEventListener("keydown", (event) => {
 });
 addPanelButton.addEventListener("click", addPanel);
 panelCountOneButton.addEventListener("click", () => {
-  if (mobileLayout.matches) setTouchPanelCount(1);
-  else setDesktopPanelMode(1);
+  if (desktopLikePanels()) setDesktopPanelMode(1);
+  else setTouchPanelCount(1);
 });
 panelCountTwoButton.addEventListener("click", () => {
-  if (mobileLayout.matches) setTouchPanelCount(2);
-  else setDesktopPanelMode(2);
+  if (desktopLikePanels()) setDesktopPanelMode(2);
+  else setTouchPanelCount(2);
 });
 panelFitVisibleButton.addEventListener("click", fitVisiblePanels);
 verseLayoutStackedButton.addEventListener("click", () => setVerseLayout("stacked"));
@@ -2337,6 +2362,7 @@ searchForm.addEventListener("submit", (event) => {
 });
 portraitLayout.addEventListener("change", schedulePanelLayoutAlignment);
 touchPanelToggleLayout.addEventListener("change", schedulePanelLayoutAlignment);
+touchPanelToggleLayout.addEventListener("change", syncTrackFreeScroll);
 
 // GitHub Pages' CDN can keep serving a stale index.html/app.js for a while
 // after a deploy, and an already-open tab never re-fetches it on its own.
