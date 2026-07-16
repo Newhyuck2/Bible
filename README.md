@@ -1,6 +1,6 @@
 # 나란히 성경
 
-개역개정, 새번역, 우리말, NIV, ESV, KJV, 新译本(CNV) 본문을 절 단위로 비교하고 여러 성경을 패널로 동시에 펼쳐 보는 정적 웹사이트입니다.
+개역개정, 새번역, 우리말, ESV, NIV, KJV, NASB, NRSV, 新译本(CNV) 본문을 절 단위로 비교하고 여러 성경을 패널로 동시에 펼쳐 보는 정적 웹사이트입니다. 헤더의 **＋ Versions** 선택창에서 English / Korean / Chinese 그룹별로 역본을 골라 추가하고, 칩을 드래그해 순서를 바꾸거나 ×로 제거합니다.
 
 ## 데이터 생성
 
@@ -10,7 +10,7 @@ Python 3만 있으면 됩니다. `data.db`를 갱신한 뒤 다음 명령으로 
 python scripts/export_data.py
 ```
 
-KJV(영어)와 CNV(중국어 신역본, 간체) 원문은 `scripts/import_kjv_cnv.py`가 인터넷에서 내려받아 `data.db`에 채워 넣습니다(재실행 시 갱신).
+KJV(영어)와 CNV(중국어 신역본, 간체) 원문은 `scripts/import_kjv_cnv.py`가, NASB(1995)와 NRSV 원문은 `scripts/import_nasb_nrsv.py`가 인터넷에서 내려받아 `data.db`에 채워 넣습니다(재실행 시 갱신).
 
 ## 로컬 미리보기
 

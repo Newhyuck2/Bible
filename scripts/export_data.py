@@ -16,6 +16,8 @@ TRANSLATIONS = [
     {"id": "ESV", "label": "ESV", "name": "English Standard Version"},
     {"id": "NIV", "label": "NIV", "name": "New International Version"},
     {"id": "KJV", "label": "KJV", "name": "King James Version"},
+    {"id": "NASB", "label": "NASB", "name": "New American Standard Bible"},
+    {"id": "NRSV", "label": "NRSV", "name": "New Revised Standard Version"},
     {"id": "GAE", "label": "개역개정", "name": "Korean Revised Version"},
     {"id": "SAENEW", "label": "새번역", "name": "Korean New Translation"},
     {"id": "WLB", "label": "우리말", "name": "Woorimal Bible"},

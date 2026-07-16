@@ -3,11 +3,18 @@ const TRANSLATION_COLORS = {
   ESV: "#9b5c34",
   NIV: "#476f9b",
   KJV: "#79652f",
+  NASB: "#42808a",
+  NRSV: "#8a6d1f",
   GAE: "#2f7663",
   SAENEW: "#805692",
   WLB: "#a24f62",
   CNV: "#5d5fa0",
 };
+const TRANSLATION_GROUPS = [
+  { label: "English", ids: ["ESV", "NIV", "KJV", "NASB", "NRSV"] },
+  { label: "Korean", ids: ["GAE", "SAENEW", "WLB"] },
+  { label: "Chinese", ids: ["CNV"] },
+];
 const ASSET_VERSION = document.querySelector('meta[name="asset-version"]').content;
 const MOBILE_LAYOUT_QUERY = "(max-width: 820px), (max-width: 1366px) and (any-pointer: coarse)";
 const mobileLayout = window.matchMedia(MOBILE_LAYOUT_QUERY);
@@ -24,6 +31,9 @@ const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 const panelTrack = document.querySelector("#panel-track");
 const panelTemplate = document.querySelector("#panel-template");
 const translationList = document.querySelector("#translation-list");
+const translationPicker = document.querySelector("#translation-picker");
+const translationPickerToggle = document.querySelector("#translation-picker-toggle");
+const translationPickerMenu = document.querySelector("#translation-picker-menu");
 const addPanelButton = document.querySelector("#add-panel");
 const searchDialog = document.querySelector("#search-dialog");
 const openSearchButton = document.querySelector("#open-search");
@@ -71,7 +81,6 @@ const searchWorker = new Worker(`./search-worker.js?v=${ASSET_VERSION}`);
 
 function freshState() {
   return {
-    translationOrder: ["ESV", "NIV", "KJV", "GAE", "SAENEW", "WLB", "CNV"],
     enabledTranslations: ["ESV", "NIV", "GAE"],
     fontSize: 14,
     touchPanelCount: null,
@@ -93,12 +102,15 @@ function loadState() {
 
 function sanitizeState() {
   const validTranslations = new Set(manifest.translations.map((item) => item.id));
-  const order = state.translationOrder.filter((id) => validTranslations.has(id));
-  for (const id of validTranslations) {
-    if (!order.includes(id)) order.push(id);
+  const enabled = (Array.isArray(state.enabledTranslations) ? state.enabledTranslations : [])
+    .filter((id) => validTranslations.has(id));
+  if (Array.isArray(state.translationOrder)) {
+    // Migrate saves from when a separate translationOrder drove the chip row.
+    const position = new Map(state.translationOrder.map((id, index) => [id, index]));
+    enabled.sort((a, b) => (position.get(a) ?? 0) - (position.get(b) ?? 0));
+    delete state.translationOrder;
   }
-  state.translationOrder = order;
-  state.enabledTranslations = state.enabledTranslations.filter((id) => validTranslations.has(id));
+  state.enabledTranslations = [...new Set(enabled)];
   state.fontSize = Math.max(10, Math.min(Number(state.fontSize) || 14, 22));
   state.verseLayout = state.verseLayout === "columns" ? "columns" : "stacked";
   const savedPanelCount = Number(state.touchPanelCount);
@@ -122,7 +134,6 @@ function saveState() {
   localStorage.setItem(
     STORAGE_KEY,
     JSON.stringify({
-      translationOrder: state.translationOrder,
       enabledTranslations: state.enabledTranslations,
       fontSize: state.fontSize,
       touchPanelCount: state.touchPanelCount,
@@ -138,8 +149,7 @@ function isTwoPanelTouchMode() {
 }
 
 function enabledTranslationIds() {
-  if (!state) return [];
-  return state.translationOrder.filter((id) => state.enabledTranslations.includes(id));
+  return state ? state.enabledTranslations : [];
 }
 
 function effectiveVerseLayout() {
@@ -290,6 +300,7 @@ function schedulePanelLayoutAlignment() {
 function resetSite() {
   if (searchDialog.open) closeSearch();
   if (copyDialog.open) closeCopyDialog();
+  closeTranslationPicker();
   localStorage.removeItem(STORAGE_KEY);
 
   for (const { panel } of panelElements.values()) panel.remove();
@@ -319,23 +330,25 @@ function translationMeta(id) {
 
 function translationLanguage(id) {
   if (id === "CNV") return "zh";
-  return id === "ESV" || id === "NIV" || id === "KJV" ? "en" : "ko";
+  return ["ESV", "NIV", "KJV", "NASB", "NRSV"].includes(id) ? "en" : "ko";
 }
 
 function renderTranslationControls() {
+  renderTranslationChips();
+  if (!translationPickerMenu.hidden) renderTranslationPickerMenu();
+}
+
+// The chip row shows only the translations currently in use, in reading
+// order: drag (mouse) or the ⠿ handle (touch) reorders, × removes.
+function renderTranslationChips() {
   translationList.replaceChildren();
 
-  state.translationOrder.forEach((id) => {
+  for (const id of enabledTranslationIds()) {
     const meta = translationMeta(id);
-    const isEnabled = state.enabledTranslations.includes(id);
     const chip = document.createElement("div");
-    chip.className = "translation-chip";
-    chip.classList.toggle("selected", isEnabled);
+    chip.className = "translation-chip selected";
     chip.draggable = true;
     chip.dataset.translation = id;
-    chip.tabIndex = 0;
-    chip.setAttribute("role", "checkbox");
-    chip.setAttribute("aria-checked", String(isEnabled));
     chip.setAttribute("aria-label", `${meta.label} translation`);
 
     const handle = document.createElement("span");
@@ -349,28 +362,27 @@ function renderTranslationControls() {
       container: translationList,
       itemClass: "translation-chip",
       id,
-      getOrder: () => state.translationOrder,
+      getOrder: () => state.enabledTranslations,
       onReorder: moveTranslation,
     });
-
-    const toggleTranslation = () => {
-      const shouldEnable = !state.enabledTranslations.includes(id);
-      if (shouldEnable) {
-        state.enabledTranslations.push(id);
-      } else {
-        state.enabledTranslations = state.enabledTranslations.filter((item) => item !== id);
-      }
-      saveState();
-      chip.classList.toggle("selected", shouldEnable);
-      chip.setAttribute("aria-checked", String(shouldEnable));
-      applyVerseLayout();
-    };
 
     const name = document.createElement("span");
     name.className = "translation-name";
     name.lang = translationLanguage(id);
     name.textContent = meta.label;
     name.style.setProperty("--translation-color", TRANSLATION_COLORS[id]);
+
+    const removeButton = document.createElement("button");
+    removeButton.type = "button";
+    removeButton.className = "chip-remove";
+    removeButton.setAttribute("aria-label", `Remove ${meta.label}`);
+    removeButton.title = `Remove ${meta.label}`;
+    removeButton.textContent = "×";
+    removeButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      removeTranslation(id);
+    });
+    removeButton.addEventListener("pointerdown", (event) => event.stopPropagation());
 
     chip.addEventListener("dragstart", (event) => {
       chip.classList.add("dragging");
@@ -382,33 +394,128 @@ function renderTranslationControls() {
     chip.addEventListener("drop", (event) => {
       event.preventDefault();
       const draggedId = event.dataTransfer.getData("text/plain");
-      const from = state.translationOrder.indexOf(draggedId);
-      const to = state.translationOrder.indexOf(id);
+      const from = state.enabledTranslations.indexOf(draggedId);
+      const to = state.enabledTranslations.indexOf(id);
       if (from >= 0 && to >= 0 && from !== to) moveTranslation(from, to);
     });
-    chip.addEventListener("click", (event) => {
-      toggleTranslation();
-    });
-    chip.addEventListener("keydown", (event) => {
-      if (event.target !== chip) return;
-      if (event.key !== "Enter" && event.key !== " ") return;
-      event.preventDefault();
-      toggleTranslation();
-    });
 
-    chip.append(handle, name);
+    chip.append(handle, name, removeButton);
     translationList.append(chip);
-  });
+  }
 }
 
-function moveTranslation(from, to) {
-  if (to < 0 || to >= state.translationOrder.length) return;
-  const [item] = state.translationOrder.splice(from, 1);
-  state.translationOrder.splice(to, 0, item);
+function addTranslation(id) {
+  if (!translationMeta(id) || state.enabledTranslations.includes(id)) return;
+  state.enabledTranslations.push(id);
   saveState();
   renderTranslationControls();
   applyVerseLayout();
 }
+
+function removeTranslation(id) {
+  if (!state.enabledTranslations.includes(id)) return;
+  state.enabledTranslations = state.enabledTranslations.filter((item) => item !== id);
+  saveState();
+  renderTranslationControls();
+  applyVerseLayout();
+}
+
+function moveTranslation(from, to) {
+  if (to < 0 || to >= state.enabledTranslations.length) return;
+  const [item] = state.enabledTranslations.splice(from, 1);
+  state.enabledTranslations.splice(to, 0, item);
+  saveState();
+  renderTranslationControls();
+  applyVerseLayout();
+}
+
+// ---- Translation picker ----
+// A grouped dropdown (English / Korean / Chinese) that adds a translation
+// per pick; picking one that is already shown removes it again.
+let pickerSuppressClickUntil = 0;
+// A touch press opens the picker on pointerdown (so a drag can run through
+// it); the click that same tap fires afterwards must not toggle it shut.
+let pickerOpenedByTouchPress = false;
+
+function renderTranslationPickerMenu() {
+  translationPickerMenu.replaceChildren();
+  if (!manifest) return;
+  for (const group of TRANSLATION_GROUPS) {
+    const ids = group.ids.filter((id) => translationMeta(id));
+    if (!ids.length) continue;
+    const section = document.createElement("div");
+    section.className = "translation-picker-group";
+    const heading = document.createElement("div");
+    heading.className = "translation-picker-group-label";
+    heading.textContent = group.label;
+    section.append(heading);
+    for (const id of ids) {
+      const meta = translationMeta(id);
+      const isEnabled = state.enabledTranslations.includes(id);
+      const option = document.createElement("button");
+      option.type = "button";
+      option.className = "translation-picker-option";
+      option.classList.toggle("selected", isEnabled);
+      option.dataset.translation = id;
+      option.setAttribute("role", "option");
+      option.setAttribute("aria-selected", String(isEnabled));
+
+      const check = document.createElement("span");
+      check.className = "picker-check";
+      check.textContent = "✓";
+      check.setAttribute("aria-hidden", "true");
+      const label = document.createElement("span");
+      label.className = "picker-label";
+      label.lang = translationLanguage(id);
+      label.textContent = meta.label;
+      label.style.setProperty("--translation-color", TRANSLATION_COLORS[id]);
+      const name = document.createElement("span");
+      name.className = "picker-name";
+      name.textContent = meta.name;
+
+      option.addEventListener("click", () => {
+        if (state.enabledTranslations.includes(id)) removeTranslation(id);
+        else addTranslation(id);
+        renderTranslationPickerMenu();
+      });
+      option.append(check, label, name);
+      section.append(option);
+    }
+    translationPickerMenu.append(section);
+  }
+}
+
+function openTranslationPicker() {
+  if (!translationPickerMenu.hidden) return;
+  renderTranslationPickerMenu();
+  translationPickerMenu.hidden = false;
+  translationPickerToggle.setAttribute("aria-expanded", "true");
+}
+
+function closeTranslationPicker() {
+  pickerOpenedByTouchPress = false;
+  if (translationPickerMenu.hidden) return;
+  translationPickerMenu.hidden = true;
+  translationPickerToggle.setAttribute("aria-expanded", "false");
+}
+
+translationPickerToggle.addEventListener("click", () => {
+  const openedByThisPress = pickerOpenedByTouchPress;
+  pickerOpenedByTouchPress = false;
+  if (Date.now() < pickerSuppressClickUntil) return;
+  if (translationPickerMenu.hidden) openTranslationPicker();
+  else if (!openedByThisPress) closeTranslationPicker();
+});
+
+document.addEventListener("pointerdown", (event) => {
+  if (translationPickerMenu.hidden) return;
+  if (translationPicker.contains(event.target)) return;
+  closeTranslationPicker();
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !translationPickerMenu.hidden) closeTranslationPicker();
+});
 
 // Native HTML5 drag-and-drop (dragstart/dragover/drop) does not fire on touch
 // input, so touch reordering is driven by Pointer Events instead: the dragged
@@ -496,6 +603,105 @@ function setupTouchReorder({ item, handle, container, itemClass, id, getOrder, o
   });
 }
 
+// Native-select feel for touch: a press that starts on `opener` opens the
+// menu, sliding the finger highlights the option underneath (auto-scrolling
+// near the menu's edges), and lifting on an option picks it. A drag that
+// starts on the menu itself stays a normal scroll, and a plain tap falls
+// through to the regular click handlers.
+function setupPressDragPick({ opener, menu, optionSelector, onOpen, onPick, onGestureEnd }) {
+  opener.addEventListener("pointerdown", (event) => {
+    if (event.pointerType !== "touch") return;
+    onOpen?.();
+    const pointerId = event.pointerId;
+    const startX = event.clientX;
+    const startY = event.clientY;
+    let dragging = false;
+    let highlighted = null;
+    let lastX = startX;
+    let lastY = startY;
+    let scrollFrame = 0;
+
+    try {
+      opener.setPointerCapture(pointerId);
+    } catch {
+      return;
+    }
+
+    const optionUnder = (x, y) => {
+      const option = document.elementFromPoint(x, y)?.closest(optionSelector);
+      return option && menu.contains(option) ? option : null;
+    };
+    const setHighlight = (option) => {
+      if (highlighted === option) return;
+      highlighted?.classList.remove("highlighted");
+      highlighted = option;
+      highlighted?.classList.add("highlighted");
+    };
+    const autoScroll = () => {
+      scrollFrame = 0;
+      if (!dragging || menu.scrollHeight <= menu.clientHeight) return;
+      const rect = menu.getBoundingClientRect();
+      const delta = lastY < rect.top + 36 ? -8 : lastY > rect.bottom - 36 ? 8 : 0;
+      if (!delta) return;
+      menu.scrollTop += delta;
+      setHighlight(optionUnder(lastX, lastY));
+      scrollFrame = requestAnimationFrame(autoScroll);
+    };
+
+    const move = (moveEvent) => {
+      if (moveEvent.pointerId !== pointerId) return;
+      lastX = moveEvent.clientX;
+      lastY = moveEvent.clientY;
+      if (!dragging && Math.hypot(lastX - startX, lastY - startY) < 7) return;
+      dragging = true;
+      moveEvent.preventDefault();
+      setHighlight(optionUnder(lastX, lastY));
+      if (!scrollFrame) scrollFrame = requestAnimationFrame(autoScroll);
+    };
+    const finish = (finishEvent) => {
+      if (finishEvent.pointerId !== pointerId) return;
+      opener.removeEventListener("pointermove", move);
+      opener.removeEventListener("pointerup", finish);
+      opener.removeEventListener("pointercancel", cancel);
+      cancelAnimationFrame(scrollFrame);
+      if (opener.hasPointerCapture(pointerId)) opener.releasePointerCapture(pointerId);
+      const picked = dragging ? highlighted : null;
+      setHighlight(null);
+      if (dragging) finishEvent.preventDefault();
+      if (picked) onPick(picked);
+      if (dragging) onGestureEnd?.(Boolean(picked));
+    };
+    const cancel = (cancelEvent) => {
+      if (cancelEvent.pointerId !== pointerId) return;
+      opener.removeEventListener("pointermove", move);
+      opener.removeEventListener("pointerup", finish);
+      opener.removeEventListener("pointercancel", cancel);
+      cancelAnimationFrame(scrollFrame);
+      setHighlight(null);
+      if (dragging) onGestureEnd?.(false);
+    };
+
+    opener.addEventListener("pointermove", move, { passive: false });
+    opener.addEventListener("pointerup", finish);
+    opener.addEventListener("pointercancel", cancel);
+  });
+}
+
+setupPressDragPick({
+  opener: translationPickerToggle,
+  menu: translationPickerMenu,
+  optionSelector: ".translation-picker-option",
+  onOpen: () => {
+    if (!translationPickerMenu.hidden) return;
+    openTranslationPicker();
+    pickerOpenedByTouchPress = true;
+  },
+  onPick: (option) => option.click(),
+  onGestureEnd: () => {
+    pickerSuppressClickUntil = Date.now() + 500;
+  },
+});
+
 const HANGUL_INITIALS = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ";
 
 function hangulInitials(value) {
@@ -517,29 +723,28 @@ function matchesBook(item, query) {
     && hangulInitials(item.ko).includes(compact);
 }
 
-function syncComboboxInputMode(input) {
-  if (!input.dataset.desktopInputMode) {
-    input.dataset.desktopInputMode = input.getAttribute("inputmode") || "default";
-  }
-  input.readOnly = mobileLayout.matches;
-  if (mobileLayout.matches) {
-    input.setAttribute("inputmode", "none");
-  } else if (input.dataset.desktopInputMode === "default") {
-    input.removeAttribute("inputmode");
-  } else {
-    input.setAttribute("inputmode", input.dataset.desktopInputMode);
-  }
-}
-
 function syncTrackFreeScroll() {
   panelTrack.classList.toggle("free-scroll", !mobileLayout.matches);
 }
 syncTrackFreeScroll();
 
 mobileLayout.addEventListener("change", () => {
-  document.querySelectorAll(".combo-input").forEach(syncComboboxInputMode);
   updatePanelCountControls();
   syncTrackFreeScroll();
+});
+
+// A combo opened from its toggle by touch never focuses the input (so the
+// on-screen keyboard stays away); tapping anywhere else closes such a menu,
+// since the input-blur closer only covers keyboard-focused combos.
+document.addEventListener("pointerdown", (event) => {
+  for (const menu of document.querySelectorAll(".combo-menu:not([hidden])")) {
+    const combo = menu.closest(".combo");
+    if (!combo || combo.contains(event.target)) continue;
+    const input = combo.querySelector(".combo-input");
+    if (document.activeElement === input) continue;
+    menu.hidden = true;
+    input?.setAttribute("aria-expanded", "false");
+  }
 });
 
 // The portrait two-row header keeps the "Holy Bible" label only while it
@@ -738,12 +943,21 @@ function setupCombobox({ input, toggle, menu, items, selectedValue, matches, onS
     menu.hidden = false;
     input.setAttribute("aria-expanded", "true");
     centerHighlighted();
-    if (selectText && !input.readOnly) input.select();
+    if (selectText && document.activeElement === input) input.select();
   }
 
-  input.addEventListener("focus", () => open(true));
+  // After a touch press-drag pick, the browser may still deliver the tap's
+  // focus/click to the opener; those must not reopen the menu just chosen
+  // from.
+  let suppressReopenUntil = 0;
+  const reopenSuppressed = () => Date.now() < suppressReopenUntil;
+  let toggleByTouch = false;
+
+  input.addEventListener("focus", () => {
+    if (!reopenSuppressed()) open(true);
+  });
   input.addEventListener("click", () => {
-    if (input.readOnly) open(true);
+    if (!reopenSuppressed() && menu.hidden) open(true);
   });
   input.addEventListener("input", () => {
     render(input.value);
@@ -773,12 +987,33 @@ function setupCombobox({ input, toggle, menu, items, selectedValue, matches, onS
       input.value = selectedItem()?.label ?? "";
     }, 100);
   });
+  toggle.addEventListener("pointerdown", (event) => {
+    toggleByTouch = event.pointerType === "touch";
+  });
   toggle.addEventListener("click", () => {
-    input.focus();
+    if (reopenSuppressed()) return;
+    // Touch keeps the on-screen keyboard away: pick from the list instead.
+    if (!toggleByTouch) input.focus();
     open(true);
   });
 
-  syncComboboxInputMode(input);
+  const attachPressDragPick = (opener) =>
+    setupPressDragPick({
+      opener,
+      menu,
+      optionSelector: ".combo-option",
+      onOpen: () => {
+        if (menu.hidden) open(true);
+      },
+      onPick: (option) => option.click(),
+      onGestureEnd: (picked) => {
+        suppressReopenUntil = Date.now() + 500;
+        if (!picked && document.activeElement !== input) close();
+      },
+    });
+  attachPressDragPick(toggle);
+  attachPressDragPick(input);
+
   choose(selectedItem(), false);
   close();
 
@@ -1765,11 +2000,9 @@ function openCopyDialog(panelState) {
     ? `${panelState.chapter}:${bounds[0]}`
     : `${panelState.chapter}:${bounds[0]}-${bounds[1]}`;
   copyReference.textContent = `${book.en} ${book.ko} ${reference}`;
-  const defaultTranslations = state.enabledTranslations.length
-    ? new Set(state.enabledTranslations)
-    : new Set(state.translationOrder);
-  copyTranslationOrder = [...state.translationOrder];
-  renderCopyTranslationOptions(defaultTranslations);
+  // Offer only the translations currently shown, in their reading order.
+  copyTranslationOrder = [...enabledTranslationIds()];
+  renderCopyTranslationOptions(new Set(copyTranslationOrder));
   copyDialog.showModal();
 }
 
@@ -1858,7 +2091,7 @@ function closeSearch() {
 }
 
 function runSearch(query) {
-  const translations = state.translationOrder.filter((id) => state.enabledTranslations.includes(id));
+  const translations = enabledTranslationIds();
   searchBookList.replaceChildren();
   searchResults.replaceChildren();
   if (!translations.length) {
@@ -1954,8 +2187,9 @@ function renderSearchResults(query, matches, bookCounts, totalTranslationMatches
     reference.append(referenceText, arrow);
     button.append(reference);
 
+    const translationOrder = enabledTranslationIds();
     result.lines.sort(
-      (a, b) => state.translationOrder.indexOf(a.translation) - state.translationOrder.indexOf(b.translation),
+      (a, b) => translationOrder.indexOf(a.translation) - translationOrder.indexOf(b.translation),
     );
     for (const line of result.lines) {
       const row = document.createElement("div");
