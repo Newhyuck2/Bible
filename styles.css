@@ -12,6 +12,7 @@
   --accent-soft: #e3eee9;
   --warm: #aa6c3d;
   --verse-font-size: 14px;
+  --toolbar-icon-gap: 4px;
   --shadow: 0 18px 45px rgba(55, 45, 30, 0.1);
   --radius: 16px;
   font-family:
@@ -120,7 +121,7 @@ p {
 
 .header-actions {
   display: flex;
-  gap: 9px;
+  gap: var(--toolbar-icon-gap);
 }
 
 .button {
@@ -812,7 +813,7 @@ mark {
 }
 
 .compact-toolbar {
-  gap: 9px;
+  gap: var(--toolbar-icon-gap);
 }
 
 .translation-list {
@@ -843,7 +844,7 @@ mark {
 }
 
 .header-actions {
-  gap: 6px;
+  gap: var(--toolbar-icon-gap);
 }
 
 .header-actions .button {
@@ -855,7 +856,7 @@ mark {
 
 .font-size-control {
   height: 32px;
-  gap: 3px;
+  gap: var(--toolbar-icon-gap);
   padding: 0 4px;
   border-radius: 8px;
 }
@@ -1039,7 +1040,7 @@ mark {
   flex: 0 0 auto;
   height: 36px;
   align-items: center;
-  gap: 6px;
+  gap: var(--toolbar-icon-gap);
   padding: 0 9px;
   border: 1px solid var(--line);
   border-radius: 9px;
@@ -1364,7 +1365,7 @@ mark {
   height: 100%;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
+  gap: var(--toolbar-icon-gap);
 }
 
 .compact-toolbar .translation-controls {
@@ -1372,7 +1373,7 @@ mark {
   flex: 1 1 auto;
   min-width: 0;
   align-items: center;
-  gap: 7px;
+  gap: var(--toolbar-icon-gap);
 }
 
 .compact-toolbar .translation-list {
@@ -1797,7 +1798,7 @@ body * {
 }
 
 .compact-toolbar {
-  gap: 9px;
+  gap: var(--toolbar-icon-gap);
 }
 
 .translation-list {
@@ -1828,7 +1829,7 @@ body * {
 }
 
 .header-actions {
-  gap: 6px;
+  gap: var(--toolbar-icon-gap);
 }
 
 .header-actions .button {
@@ -1840,7 +1841,7 @@ body * {
 
 .font-size-control {
   height: 32px;
-  gap: 3px;
+  gap: var(--toolbar-icon-gap);
   padding: 0 4px;
   border-radius: 8px;
 }
@@ -2035,7 +2036,7 @@ body * {
       "brand verse view font actions"
       "translations translations translations translations translations";
     align-items: center;
-    gap: 4px 6px;
+    gap: var(--toolbar-icon-gap);
   }
 
   .site-brand {
@@ -2064,7 +2065,7 @@ body * {
     width: 100%;
     min-width: 0;
     align-items: center;
-    gap: 5px;
+    gap: var(--toolbar-icon-gap);
   }
 
   .compact-toolbar .translation-list {
@@ -2109,7 +2110,7 @@ body * {
 
   .header-actions {
     grid-area: actions;
-    gap: 4px;
+    gap: var(--toolbar-icon-gap);
   }
 
   .workspace {
@@ -2836,7 +2837,7 @@ body * {
   flex: 0 0 auto;
   height: 32px;
   align-items: center;
-  gap: 2px;
+  gap: var(--toolbar-icon-gap);
   padding: 1px 3px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -2897,6 +2898,10 @@ body * {
 }
 
 @media (orientation: portrait) and (max-width: 599px) {
+  .site-brand > span:last-child {
+    display: inline !important;
+  }
+
   .panel-count-control {
     display: none !important;
   }
@@ -2915,7 +2920,7 @@ body * {
     grid-template-columns: auto minmax(0, 1fr) auto auto auto auto;
     grid-template-rows: 34px;
     grid-template-areas: "brand translations verse view font actions";
-    gap: 6px;
+    gap: var(--toolbar-icon-gap);
   }
 
   .compact-toolbar .translation-controls {
@@ -2928,7 +2933,7 @@ body * {
     display: flex;
     height: 32px;
     align-items: center;
-    gap: 2px;
+    gap: var(--toolbar-icon-gap);
     padding: 1px 3px;
     border: 1px solid var(--line);
     border-radius: 8px;
@@ -3011,7 +3016,7 @@ html[data-verse-layout="columns"] .translation-label {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  gap: var(--toolbar-icon-gap);
 }
 
 .download-app svg {

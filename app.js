@@ -889,6 +889,7 @@ const panelCountControl = panelCountOneButton.closest(".panel-count-control");
 function updateBrandLabelVisibility() {
   if (!brandLabel) return;
   document.body.classList.remove("brand-label-hidden");
+  if (phonePortraitLayout.matches) return;
   if (!mobileLayout.matches || touchPanelToggleLayout.matches) return;
   const brandRect = siteBrand.getBoundingClientRect();
   const controlLeft = Math.min(
@@ -908,6 +909,7 @@ function scheduleBrandLabelUpdate() {
 
 window.addEventListener("resize", scheduleBrandLabelUpdate);
 mobileLayout.addEventListener("change", scheduleBrandLabelUpdate);
+phonePortraitLayout.addEventListener("change", scheduleBrandLabelUpdate);
 touchPanelToggleLayout.addEventListener("change", scheduleBrandLabelUpdate);
 scheduleBrandLabelUpdate();
 
