@@ -185,6 +185,8 @@ p {
 
 .translation-list {
   display: flex;
+  flex: 1 1 auto;
+  order: 1;
   min-width: 0;
   gap: 8px;
   overflow-x: auto;
@@ -1374,7 +1376,7 @@ mark {
 }
 
 .compact-toolbar .translation-list {
-  flex: 0 1 auto;
+  flex: 1 1 auto;
   min-width: 0;
 }
 
@@ -2027,11 +2029,11 @@ body * {
     display: grid;
     width: 100%;
     height: 100%;
-    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-columns: auto minmax(0, 1fr) auto auto auto;
     grid-template-rows: 34px 35px;
     grid-template-areas:
-      "brand verse font actions"
-      "translations translations translations translations";
+      "brand verse view font actions"
+      "translations translations translations translations translations";
     align-items: center;
     gap: 4px 6px;
   }
@@ -2066,7 +2068,7 @@ body * {
   }
 
   .compact-toolbar .translation-list {
-    flex: 0 1 auto;
+    flex: 1 1 auto;
     min-width: 0;
     margin: 0;
     padding: 1px 0 2px;
@@ -2130,6 +2132,7 @@ body * {
 
   .bible-panel {
     height: 100%;
+    touch-action: pan-y pinch-zoom;
   }
 
   .panel-header {
@@ -2201,6 +2204,10 @@ body * {
   }
 
   .swiping-panels .panel-content {
+    user-select: none;
+  }
+
+  .swiping-panels .bible-panel {
     user-select: none;
   }
 
@@ -2447,19 +2454,22 @@ body * {
   white-space: nowrap;
 }
 
-/* Only phones in portrait keep the one-panel pager: full-width panels that
-   snap one per screen. */
+/* Phones in portrait keep full-width panels by default, but horizontal
+   dragging stays continuous instead of snapping one panel per swipe. */
 @media (orientation: portrait) and (max-width: 599px) {
   .panel-track {
-    scroll-snap-type: x mandatory;
+    scroll-snap-type: none;
   }
 
   .bible-panel {
     flex: 0 0 calc(100vw - 12px);
     flex-basis: calc(100vw - 12px) !important;
     width: calc(100vw - 12px);
-    scroll-snap-align: center;
-    scroll-snap-stop: always;
+  }
+
+  html[data-touch-panel-count="2"] .bible-panel {
+    flex-basis: calc((100vw - 20px) / 2) !important;
+    width: calc((100vw - 20px) / 2);
   }
 }
 
@@ -2776,6 +2786,15 @@ body * {
   scroll-snap-type: none;
 }
 
+.panel-track.fit-all-panels {
+  gap: 0;
+}
+
+.swiping-panels .panel-track {
+  scroll-behavior: auto;
+  scroll-snap-type: none;
+}
+
 .bible-panel.panel-longpress-dragging {
   z-index: 7;
   opacity: 0.94;
@@ -2864,12 +2883,11 @@ body * {
   stroke-width: 1.7;
 }
 
-/* Touch layouts hide the panel-count control in portrait (one panel per
-   screen there), but the verse layout toggle stays available everywhere:
-   portrait places it at the end of the translations row. */
 @media (max-width: 820px), (max-width: 1366px) and (any-pointer: coarse) {
   .panel-count-control {
-    display: none;
+    grid-area: view;
+    display: flex;
+    justify-self: end;
   }
 
   .verse-layout-control {
@@ -3060,12 +3078,14 @@ html[data-verse-layout="columns"] .translation-label {
 .translation-picker {
   position: relative;
   flex: 0 0 auto;
+  order: 0;
 }
 
 .translation-picker-toggle {
   display: inline-flex;
   height: 32px;
   align-items: center;
+  justify-content: center;
   gap: 4px;
   padding: 0 8px;
   border: 1px solid var(--line);
@@ -3187,24 +3207,37 @@ html[data-verse-layout="columns"] .translation-label {
 
 /* Selected-translation chips: name plus a remove control. */
 .translation-name {
+  display: flex;
+  height: 100%;
+  align-items: center;
   color: var(--translation-color);
   font-size: 11px;
   font-weight: 800;
+  line-height: 1;
   white-space: nowrap;
 }
 
 .translation-chip .chip-remove {
-  display: grid;
+  display: flex;
   width: 18px;
   height: 20px;
+  align-items: center;
+  justify-content: center;
   padding: 0;
-  place-items: center;
   border: 0;
   border-radius: 5px;
   background: transparent;
   color: #9c9589;
-  font-size: 14px;
+  font-size: 0;
   line-height: 1;
+}
+
+.translation-chip .chip-remove::before {
+  content: "×";
+  display: block;
+  font-size: 15px;
+  line-height: 1;
+  transform: translateY(-0.5px);
 }
 
 .translation-chip .chip-remove:hover {
@@ -3220,16 +3253,26 @@ html[data-verse-layout="columns"] .translation-label {
 
 @media (max-width: 820px), (max-width: 1366px) and (any-pointer: coarse) {
   .translation-picker-toggle {
+    width: 32px;
     height: 32px;
+    padding: 0;
+  }
+
+  .translation-picker-toggle .picker-caret {
+    display: none;
   }
 
   .translation-picker-option {
     min-height: 42px;
   }
 
+  .translation-name {
+    align-self: stretch;
+  }
+
   .translation-chip .chip-remove {
     width: 24px;
     height: 28px;
-    font-size: 16px;
+    font-size: 0;
   }
 }

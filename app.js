@@ -111,7 +111,7 @@ function sanitizeState() {
     enabled.sort((a, b) => (position.get(a) ?? 0) - (position.get(b) ?? 0));
     delete state.translationOrder;
   }
-  state.enabledTranslations = [...new Set(enabled)];
+  state.enabledTranslations = sortTranslationIds([...new Set(enabled)]);
   state.fontSize = Math.max(10, Math.min(Number(state.fontSize) || 14, 22));
   state.verseLayout = state.verseLayout === "columns" ? "columns" : "stacked";
   const savedPanelCount = Number(state.touchPanelCount);
@@ -125,7 +125,7 @@ function sanitizeState() {
       const book = Math.max(0, Math.min(Number(panel.book) || 0, manifest.books.length - 1));
       const chapter = Math.max(1, Math.min(Number(panel.chapter) || 1, manifest.books[book].chapters));
       const width = panel.width == null ? Number.NaN : Number(panel.width);
-      return { book, chapter, width: Number.isFinite(width) ? Math.max(320, Math.min(width, 5000)) : null };
+      return { book, chapter, width: Number.isFinite(width) ? Math.max(1, Math.min(width, 5000)) : null };
     })
     .slice(0, 12);
   if (!state.panels.length) state.panels = [{ book: 0, chapter: 1 }];
@@ -135,7 +135,7 @@ function saveState() {
   localStorage.setItem(
     STORAGE_KEY,
     JSON.stringify({
-      enabledTranslations: state.enabledTranslations,
+      enabledTranslations: sortTranslationIds(state.enabledTranslations),
       fontSize: state.fontSize,
       touchPanelCount: state.touchPanelCount,
       desktopPanelMode: state.desktopPanelMode,
@@ -159,7 +159,7 @@ function isTwoPanelTouchMode() {
 }
 
 function enabledTranslationIds() {
-  return state ? state.enabledTranslations : [];
+  return state ? sortTranslationIds(state.enabledTranslations) : [];
 }
 
 function effectiveVerseLayout() {
@@ -198,7 +198,14 @@ function updatePanelCountControls() {
   panelCountTwoButton.classList.toggle("selected", twoSelected);
   panelCountOneButton.setAttribute("aria-pressed", String(oneSelected));
   panelCountTwoButton.setAttribute("aria-pressed", String(twoSelected));
-  panelFitVisibleButton.disabled = !desktop || state.panels.length < 3;
+  panelFitVisibleButton.disabled = state.panels.length < 2;
+}
+
+function panelAvailableWidth() {
+  const trackStyle = getComputedStyle(panelTrack);
+  const horizontalPadding = (Number.parseFloat(trackStyle.paddingLeft) || 0)
+    + (Number.parseFloat(trackStyle.paddingRight) || 0);
+  return Math.max(1, panelTrack.clientWidth - horizontalPadding);
 }
 
 // Width for `count` side-by-side panels; multi-panel widths sit slightly
@@ -213,11 +220,33 @@ function desktopPanelFitWidth(count) {
   return Math.max(320, width);
 }
 
-function setAllDesktopPanelWidths(width) {
+function exactPanelFitWidth(count) {
+  const gap = Number.parseFloat(getComputedStyle(panelTrack).columnGap) || 0;
+  return Math.max(1, (panelAvailableWidth() - gap * (count - 1)) / count);
+}
+
+function applyPanelWidth(panel, width, important = false) {
+  panel.style.removeProperty("flex-basis");
+  panel.style.removeProperty("width");
+  panel.style.setProperty("flex-basis", `${width}px`, important ? "important" : "");
+  if (important) panel.style.setProperty("width", `${width}px`, "important");
+}
+
+function setAllDesktopPanelWidths(width, important = false) {
   for (const panelState of state.panels) {
     panelState.width = width;
     const elements = panelElements.get(panelState.id);
-    if (elements) elements.panel.style.flexBasis = `${width}px`;
+    if (elements) applyPanelWidth(elements.panel, width, important);
+  }
+}
+
+function resetPanelWidths() {
+  for (const panelState of state.panels) {
+    panelState.width = null;
+    const panel = panelElements.get(panelState.id)?.panel;
+    if (!panel) continue;
+    panel.style.removeProperty("flex-basis");
+    panel.style.removeProperty("width");
   }
 }
 
@@ -228,6 +257,7 @@ function applyDesktopPanelWidths() {
 
 function setDesktopPanelMode(mode) {
   if (mode !== 1 && mode !== 2) return;
+  panelTrack.classList.remove("fit-all-panels");
   state.desktopPanelMode = mode;
   applyDesktopPanelWidths();
   updatePanelCountControls();
@@ -259,15 +289,18 @@ function visiblePanelSpan() {
   return { first: Math.max(0, first), count: Math.max(1, count) };
 }
 
-// Give every panel an equal share of one screen, sized so exactly the panels
-// that were on screen (clipped ones included) fill it edge to edge.
+// Desktop fits the panels currently on screen; touch layouts fit every panel
+// into the screen, no matter how many panels are open.
 function fitVisiblePanels() {
-  if (!desktopLikePanels() || state.panels.length < 3) return;
-  const { first, count } = visiblePanelSpan();
-  setAllDesktopPanelWidths(desktopPanelFitWidth(count));
+  if (state.panels.length < 2) return;
+  const touchLayout = mobileLayout.matches;
+  const { first, count: visibleCount } = visiblePanelSpan();
+  const count = touchLayout ? state.panels.length : visibleCount;
+  panelTrack.classList.toggle("fit-all-panels", touchLayout);
+  setAllDesktopPanelWidths(exactPanelFitWidth(count), touchLayout);
   clearDesktopPanelMode();
   saveState();
-  alignPanelsAfterLayoutChange(first);
+  alignPanelsAfterLayoutChange(touchLayout ? 0 : first);
 }
 
 function alignPanelsAfterLayoutChange(index) {
@@ -294,6 +327,8 @@ function applyTouchPanelCount(alignmentIndex = -1) {
 
 function setTouchPanelCount(count) {
   if (count !== 1 && count !== 2) return;
+  panelTrack.classList.remove("fit-all-panels");
+  resetPanelWidths();
   const alignmentIndex = state.panels.length ? panelIndexAtViewportStart() : -1;
   state.touchPanelCount = count;
   saveState();
@@ -343,13 +378,22 @@ function translationLanguage(id) {
   return ["ESV", "NIV", "KJV", "NASB", "NRSV"].includes(id) ? "en" : "ko";
 }
 
+function canonicalTranslationRank(id) {
+  const rank = TRANSLATION_CANONICAL_ORDER.indexOf(id);
+  return rank >= 0 ? rank : TRANSLATION_CANONICAL_ORDER.length;
+}
+
+function sortTranslationIds(ids) {
+  return [...ids].sort((a, b) => canonicalTranslationRank(a) - canonicalTranslationRank(b));
+}
+
 function renderTranslationControls() {
   renderTranslationChips();
   if (!translationPickerMenu.hidden) renderTranslationPickerMenu();
 }
 
-// The chip row shows only the translations currently in use, in reading
-// order: drag (mouse) or the ⠿ handle (touch) reorders, × removes.
+// The chip row shows only the translations currently in use, pinned to the
+// canonical ESV/NIV/KJV/NASB/NRSV/GAE/SAENEW/WLB/CNV order.
 function renderTranslationChips() {
   translationList.replaceChildren();
 
@@ -357,24 +401,8 @@ function renderTranslationChips() {
     const meta = translationMeta(id);
     const chip = document.createElement("div");
     chip.className = "translation-chip";
-    chip.draggable = true;
     chip.dataset.translation = id;
     chip.setAttribute("aria-label", `${meta.label} translation`);
-
-    const handle = document.createElement("span");
-    handle.className = "drag-handle";
-    handle.textContent = "⠿";
-    handle.title = "Drag to reorder";
-    handle.setAttribute("aria-hidden", "true");
-    setupTouchReorder({
-      item: chip,
-      handle,
-      container: translationList,
-      itemClass: "translation-chip",
-      id,
-      getOrder: () => state.enabledTranslations,
-      onReorder: moveTranslation,
-    });
 
     const name = document.createElement("span");
     name.className = "translation-name";
@@ -394,22 +422,7 @@ function renderTranslationChips() {
     });
     removeButton.addEventListener("pointerdown", (event) => event.stopPropagation());
 
-    chip.addEventListener("dragstart", (event) => {
-      chip.classList.add("dragging");
-      event.dataTransfer.setData("text/plain", id);
-      event.dataTransfer.effectAllowed = "move";
-    });
-    chip.addEventListener("dragend", () => chip.classList.remove("dragging"));
-    chip.addEventListener("dragover", (event) => event.preventDefault());
-    chip.addEventListener("drop", (event) => {
-      event.preventDefault();
-      const draggedId = event.dataTransfer.getData("text/plain");
-      const from = state.enabledTranslations.indexOf(draggedId);
-      const to = state.enabledTranslations.indexOf(id);
-      if (from >= 0 && to >= 0 && from !== to) moveTranslation(from, to);
-    });
-
-    chip.append(handle, name, removeButton);
+    chip.append(name, removeButton);
     translationList.append(chip);
   }
 }
@@ -419,12 +432,7 @@ function renderTranslationChips() {
 // after it), rather than appending at the end.
 function addTranslation(id) {
   if (!translationMeta(id) || state.enabledTranslations.includes(id)) return;
-  const rank = TRANSLATION_CANONICAL_ORDER.indexOf(id);
-  let index = state.enabledTranslations.findIndex(
-    (existing) => TRANSLATION_CANONICAL_ORDER.indexOf(existing) > rank,
-  );
-  if (index < 0) index = state.enabledTranslations.length;
-  state.enabledTranslations.splice(index, 0, id);
+  state.enabledTranslations = sortTranslationIds([...state.enabledTranslations, id]);
   saveState();
   renderTranslationControls();
   applyVerseLayout();
@@ -433,15 +441,6 @@ function addTranslation(id) {
 function removeTranslation(id) {
   if (!state.enabledTranslations.includes(id)) return;
   state.enabledTranslations = state.enabledTranslations.filter((item) => item !== id);
-  saveState();
-  renderTranslationControls();
-  applyVerseLayout();
-}
-
-function moveTranslation(from, to) {
-  if (to < 0 || to >= state.enabledTranslations.length) return;
-  const [item] = state.enabledTranslations.splice(from, 1);
-  state.enabledTranslations.splice(to, 0, item);
   saveState();
   renderTranslationControls();
   applyVerseLayout();
@@ -650,6 +649,7 @@ function setupPressDragPick({ opener, menu, optionSelector, onOpen, onPick, onGe
     const pointerId = event.pointerId;
     const startX = event.clientX;
     const startY = event.clientY;
+    const startMenuScrollTop = menu.scrollTop;
     let dragging = false;
     let highlighted = null;
     let lastX = startX;
@@ -690,6 +690,7 @@ function setupPressDragPick({ opener, menu, optionSelector, onOpen, onPick, onGe
       if (!dragging && Math.hypot(lastX - startX, lastY - startY) < 7) return;
       dragging = true;
       moveEvent.preventDefault();
+      menu.scrollTop = startMenuScrollTop - (lastY - startY);
       setHighlight(optionUnder(lastX, lastY));
       if (!scrollFrame) scrollFrame = requestAnimationFrame(autoScroll);
     };
@@ -824,14 +825,18 @@ document.addEventListener(
 // so it comes back as soon as it fits again).
 const brandLabel = siteBrand.querySelector("span:last-child");
 const verseLayoutControl = verseLayoutStackedButton.closest(".verse-layout-control");
+const panelCountControl = panelCountOneButton.closest(".panel-count-control");
 
 function updateBrandLabelVisibility() {
   if (!brandLabel) return;
   document.body.classList.remove("brand-label-hidden");
   if (!mobileLayout.matches || touchPanelToggleLayout.matches) return;
   const brandRect = siteBrand.getBoundingClientRect();
-  const toggleRect = verseLayoutControl.getBoundingClientRect();
-  if (toggleRect.left < brandRect.right + 2) {
+  const controlLeft = Math.min(
+    verseLayoutControl.getBoundingClientRect().left,
+    panelCountControl.getBoundingClientRect().left,
+  );
+  if (controlLeft < brandRect.right + 2) {
     document.body.classList.add("brand-label-hidden");
   }
 }
@@ -1023,6 +1028,7 @@ function setupCombobox({ input, menu, items, selectedValue, matches, onSelect })
   // focus/click to the opener; those must not reopen the menu just chosen
   // from.
   let suppressReopenUntil = 0;
+  let menuPointerActive = false;
   const reopenSuppressed = () => Date.now() < suppressReopenUntil;
 
   input.addEventListener("focus", () => {
@@ -1057,9 +1063,27 @@ function setupCombobox({ input, menu, items, selectedValue, matches, onSelect })
   });
   input.addEventListener("blur", () => {
     window.setTimeout(() => {
+      if (menuPointerActive) return;
       close();
       input.value = selectedItem()?.label ?? "";
     }, 100);
+  });
+  const releaseMenuPointer = () => {
+    window.setTimeout(() => {
+      menuPointerActive = false;
+    }, 150);
+  };
+  menu.addEventListener("pointerdown", (event) => {
+    menuPointerActive = true;
+    const pointerId = event.pointerId;
+    const release = (releaseEvent) => {
+      if (releaseEvent.pointerId !== pointerId) return;
+      document.removeEventListener("pointerup", release, true);
+      document.removeEventListener("pointercancel", release, true);
+      releaseMenuPointer();
+    };
+    document.addEventListener("pointerup", release, true);
+    document.addEventListener("pointercancel", release, true);
   });
   setupPressDragPick({
     opener: input,
@@ -1099,8 +1123,8 @@ function setupCombobox({ input, menu, items, selectedValue, matches, onSelect })
   };
 }
 
-// Momentum for the continuous touch pan on desktop-like layouts: the track
-// keeps gliding with the finger's release velocity (px per ms) and decays.
+// Momentum for continuous touch panning: the track keeps gliding with the
+// finger's release velocity (px per ms) and decays.
 let panelGlideFrame = 0;
 
 function cancelPanelGlide() {
@@ -1126,11 +1150,9 @@ function startPanelGlide(velocity) {
   panelGlideFrame = requestAnimationFrame(step);
 }
 
-// Horizontal touch drags on the reading surface pan the track by hand (CSS
-// touch-action reserves the horizontal axis for us). Phone portrait pages
-// exactly one panel per swipe; every other touch layout pans continuously,
-// like dragging the PC view, with momentum on release.
-function setupPanelSwipe(panel, content) {
+// Horizontal touch drags on a panel pan the track by hand, following the
+// finger position directly with momentum on release.
+function setupPanelSwipe(panel) {
   let gesture = null;
   let suppressClick = false;
   const findTouch = (touches, id) => {
@@ -1139,14 +1161,17 @@ function setupPanelSwipe(panel, content) {
     }
     return null;
   };
+  const shouldIgnoreSwipeStart = (target) => (
+    target.closest("button, input, textarea, select, .combo-menu, .panel-resize-handle")
+  );
 
-  content.addEventListener("click", (event) => {
+  panel.addEventListener("click", (event) => {
     if (!suppressClick) return;
     event.preventDefault();
     event.stopPropagation();
   }, true);
 
-  content.addEventListener("touchstart", (event) => {
+  panel.addEventListener("touchstart", (event) => {
     cancelPanelGlide();
     if (event.touches.length !== 1) {
       gesture = null;
@@ -1154,19 +1179,19 @@ function setupPanelSwipe(panel, content) {
       return;
     }
     if (!mobileLayout.matches || state.panels.length < 2) return;
+    if (shouldIgnoreSwipeStart(event.target)) return;
     const touch = event.touches[0];
     gesture = {
       touchId: touch.identifier,
       startX: touch.clientX,
       startY: touch.clientY,
       startScrollLeft: panelTrack.scrollLeft,
-      startIndex: panelIndexAtViewportStart(),
       axis: null,
       samples: [{ time: performance.now(), x: touch.clientX }],
     };
   }, { passive: true });
 
-  content.addEventListener("touchmove", (event) => {
+  panel.addEventListener("touchmove", (event) => {
     if (!gesture) return;
     if (event.touches.length !== 1) {
       gesture = null;
@@ -1184,8 +1209,8 @@ function setupPanelSwipe(panel, content) {
     const distanceX = Math.abs(deltaX);
     const distanceY = Math.abs(deltaY);
 
-    if (!gesture.axis && Math.max(distanceX, distanceY) >= 8) {
-      gesture.axis = distanceX > distanceY * 1.15 ? "horizontal" : "vertical";
+    if (!gesture.axis && Math.max(distanceX, distanceY) >= 3) {
+      gesture.axis = distanceX > distanceY ? "horizontal" : "vertical";
     }
     if (gesture.axis !== "horizontal") return;
 
@@ -1204,23 +1229,11 @@ function setupPanelSwipe(panel, content) {
     const touch = findTouch(event.changedTouches, gesture.touchId);
     if (!touch) return;
     if (gesture.axis === "horizontal") {
-      if (desktopLikePanels()) {
-        // Continuous pan: carry the release velocity into a glide.
-        const samples = gesture.samples;
-        const first = samples[0];
-        const last = samples[samples.length - 1];
-        if (!cancelled && first && last && last.time > first.time) {
-          startPanelGlide(-(last.x - first.x) / (last.time - first.time));
-        }
-      } else {
-        const deltaX = touch.clientX - gesture.startX;
-        const threshold = Math.min(70, panel.clientWidth * 0.18);
-        let targetIndex = gesture.startIndex;
-        if (!cancelled && Math.abs(deltaX) >= threshold) {
-          targetIndex += deltaX < 0 ? 1 : -1;
-        }
-        targetIndex = Math.max(0, Math.min(targetIndex, state.panels.length - 1));
-        scrollToPanelIndex(targetIndex);
+      const samples = gesture.samples;
+      const first = samples[0];
+      const last = samples[samples.length - 1];
+      if (!cancelled && first && last && last.time > first.time) {
+        startPanelGlide(-(last.x - first.x) / (last.time - first.time));
       }
 
       suppressClick = true;
@@ -1232,8 +1245,8 @@ function setupPanelSwipe(panel, content) {
     gesture = null;
   };
 
-  content.addEventListener("touchend", (event) => finish(event));
-  content.addEventListener("touchcancel", (event) => finish(event, true));
+  panel.addEventListener("touchend", (event) => finish(event));
+  panel.addEventListener("touchcancel", (event) => finish(event, true));
 }
 
 function chapterItems(bookIndex) {
@@ -1244,10 +1257,7 @@ function chapterItems(bookIndex) {
 }
 
 function maximumPanelWidth() {
-  const trackStyle = getComputedStyle(panelTrack);
-  const horizontalPadding = (Number.parseFloat(trackStyle.paddingLeft) || 0)
-    + (Number.parseFloat(trackStyle.paddingRight) || 0);
-  return Math.max(320, panelTrack.clientWidth - horizontalPadding);
+  return Math.max(320, panelAvailableWidth());
 }
 
 function setupPanelResize(panel, handle, panelState) {
@@ -1263,7 +1273,7 @@ function setupPanelResize(panel, handle, panelState) {
     const resize = (moveEvent) => {
       const width = Math.max(320, Math.min(startWidth + moveEvent.clientX - startX, maximumPanelWidth()));
       panelState.width = Math.round(width);
-      panel.style.flexBasis = `${panelState.width}px`;
+      applyPanelWidth(panel, panelState.width);
       clearDesktopPanelMode();
     };
     const finish = () => {
@@ -1282,6 +1292,7 @@ function setupPanelResize(panel, handle, panelState) {
   handle.addEventListener("dblclick", () => {
     panelState.width = null;
     panel.style.removeProperty("flex-basis");
+    panel.style.removeProperty("width");
     clearDesktopPanelMode();
     saveState();
   });
@@ -1329,7 +1340,7 @@ function createPanelElement(panelState, shouldScroll = false) {
     const renderedWidth = desktopLikePanels()
       ? Math.min(panelState.width, maximumPanelWidth())
       : panelState.width;
-    panel.style.flexBasis = `${renderedWidth}px`;
+    applyPanelWidth(panel, renderedWidth, mobileLayout.matches && !desktopLikePanels());
   }
   panel.addEventListener("pointerdown", () => setActivePanel(id));
   panel.addEventListener("focusin", () => setActivePanel(id));
@@ -1383,7 +1394,7 @@ function createPanelElement(panelState, shouldScroll = false) {
   next.addEventListener("click", () => navigateChapter(panelState, 1));
   setupPanelResize(panel, resizeHandle, panelState);
   setupPanelMoveReveal(panel, moveLeft, moveRight);
-  setupPanelSwipe(panel, content);
+  setupPanelSwipe(panel);
   setupTouchPanelLongPress(panel, panelState);
 
   panelElements.set(id, {
