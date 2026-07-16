@@ -2467,9 +2467,8 @@ body * {
     width: calc(100vw - 12px);
   }
 
-  html[data-touch-panel-count="2"] .bible-panel {
-    flex-basis: calc((100vw - 20px) / 2) !important;
-    width: calc((100vw - 20px) / 2);
+  .panel-count-control {
+    display: none !important;
   }
 }
 
@@ -2894,6 +2893,12 @@ body * {
     grid-area: verse;
     display: flex;
     justify-self: end;
+  }
+}
+
+@media (orientation: portrait) and (max-width: 599px) {
+  .panel-count-control {
+    display: none !important;
   }
 }
 

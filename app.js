@@ -26,6 +26,7 @@ const touchPanelToggleLayout = window.matchMedia(
   "(orientation: landscape) and (max-width: 1366px) and (any-pointer: coarse), "
     + "(min-width: 600px) and (max-width: 1366px) and (any-pointer: coarse)",
 );
+const phonePortraitLayout = window.matchMedia("(orientation: portrait) and (max-width: 599px)");
 const portraitLayout = window.matchMedia("(orientation: portrait)");
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
@@ -111,11 +112,13 @@ function sanitizeState() {
     enabled.sort((a, b) => (position.get(a) ?? 0) - (position.get(b) ?? 0));
     delete state.translationOrder;
   }
-  state.enabledTranslations = sortTranslationIds([...new Set(enabled)]);
+  state.enabledTranslations = [...new Set(enabled)];
   state.fontSize = Math.max(10, Math.min(Number(state.fontSize) || 14, 22));
   state.verseLayout = state.verseLayout === "columns" ? "columns" : "stacked";
   const savedPanelCount = Number(state.touchPanelCount);
-  state.touchPanelCount = savedPanelCount === 1 || savedPanelCount === 2
+  state.touchPanelCount = phonePortraitLayout.matches
+    ? 1
+    : savedPanelCount === 1 || savedPanelCount === 2
     ? savedPanelCount
     : landscapeMobile.matches ? 2 : 1;
   const savedDesktopMode = Number(state.desktopPanelMode);
@@ -135,7 +138,7 @@ function saveState() {
   localStorage.setItem(
     STORAGE_KEY,
     JSON.stringify({
-      enabledTranslations: sortTranslationIds(state.enabledTranslations),
+      enabledTranslations: state.enabledTranslations,
       fontSize: state.fontSize,
       touchPanelCount: state.touchPanelCount,
       desktopPanelMode: state.desktopPanelMode,
@@ -152,6 +155,14 @@ function desktopLikePanels() {
   return !mobileLayout.matches || touchPanelToggleLayout.matches;
 }
 
+function forcePhonePortraitOnePanel() {
+  if (!phonePortraitLayout.matches || !state) return false;
+  panelTrack.classList.remove("fit-all-panels");
+  resetPanelWidths();
+  state.touchPanelCount = 1;
+  return true;
+}
+
 // Touch layouts running the two-panel desktop preset keep the long-press
 // panel swap (the hover move buttons need a mouse).
 function isTwoPanelTouchMode() {
@@ -159,7 +170,7 @@ function isTwoPanelTouchMode() {
 }
 
 function enabledTranslationIds() {
-  return state ? sortTranslationIds(state.enabledTranslations) : [];
+  return state ? state.enabledTranslations : [];
 }
 
 function effectiveVerseLayout() {
@@ -319,6 +330,7 @@ function alignPanelsAfterLayoutChange(index) {
 
 function applyTouchPanelCount(alignmentIndex = -1) {
   if (!state) return;
+  forcePhonePortraitOnePanel();
   document.documentElement.dataset.touchPanelCount = String(state.touchPanelCount);
   updatePanelCountControls();
   applyVerseLayout();
@@ -327,6 +339,12 @@ function applyTouchPanelCount(alignmentIndex = -1) {
 
 function setTouchPanelCount(count) {
   if (count !== 1 && count !== 2) return;
+  if (phonePortraitLayout.matches) {
+    state.touchPanelCount = 1;
+    saveState();
+    applyTouchPanelCount(panelIndexAtViewportStart());
+    return;
+  }
   panelTrack.classList.remove("fit-all-panels");
   resetPanelWidths();
   const alignmentIndex = state.panels.length ? panelIndexAtViewportStart() : -1;
@@ -383,17 +401,13 @@ function canonicalTranslationRank(id) {
   return rank >= 0 ? rank : TRANSLATION_CANONICAL_ORDER.length;
 }
 
-function sortTranslationIds(ids) {
-  return [...ids].sort((a, b) => canonicalTranslationRank(a) - canonicalTranslationRank(b));
-}
-
 function renderTranslationControls() {
   renderTranslationChips();
   if (!translationPickerMenu.hidden) renderTranslationPickerMenu();
 }
 
-// The chip row shows only the translations currently in use, pinned to the
-// canonical ESV/NIV/KJV/NASB/NRSV/GAE/SAENEW/WLB/CNV order.
+// The chip row shows only the translations currently in use. New picks slot
+// near canonical order, while the handle lets touch users customize the row.
 function renderTranslationChips() {
   translationList.replaceChildren();
 
@@ -401,8 +415,24 @@ function renderTranslationChips() {
     const meta = translationMeta(id);
     const chip = document.createElement("div");
     chip.className = "translation-chip";
+    chip.draggable = true;
     chip.dataset.translation = id;
     chip.setAttribute("aria-label", `${meta.label} translation`);
+
+    const handle = document.createElement("span");
+    handle.className = "drag-handle";
+    handle.textContent = "⠿";
+    handle.title = "Drag to reorder";
+    handle.setAttribute("aria-hidden", "true");
+    setupTouchReorder({
+      item: chip,
+      handle,
+      container: translationList,
+      itemClass: "translation-chip",
+      id,
+      getOrder: () => state.enabledTranslations,
+      onReorder: moveTranslation,
+    });
 
     const name = document.createElement("span");
     name.className = "translation-name";
@@ -422,7 +452,22 @@ function renderTranslationChips() {
     });
     removeButton.addEventListener("pointerdown", (event) => event.stopPropagation());
 
-    chip.append(name, removeButton);
+    chip.addEventListener("dragstart", (event) => {
+      chip.classList.add("dragging");
+      event.dataTransfer.setData("text/plain", id);
+      event.dataTransfer.effectAllowed = "move";
+    });
+    chip.addEventListener("dragend", () => chip.classList.remove("dragging"));
+    chip.addEventListener("dragover", (event) => event.preventDefault());
+    chip.addEventListener("drop", (event) => {
+      event.preventDefault();
+      const draggedId = event.dataTransfer.getData("text/plain");
+      const from = state.enabledTranslations.indexOf(draggedId);
+      const to = state.enabledTranslations.indexOf(id);
+      if (from >= 0 && to >= 0 && from !== to) moveTranslation(from, to);
+    });
+
+    chip.append(handle, name, removeButton);
     translationList.append(chip);
   }
 }
@@ -432,7 +477,12 @@ function renderTranslationChips() {
 // after it), rather than appending at the end.
 function addTranslation(id) {
   if (!translationMeta(id) || state.enabledTranslations.includes(id)) return;
-  state.enabledTranslations = sortTranslationIds([...state.enabledTranslations, id]);
+  const rank = canonicalTranslationRank(id);
+  let index = state.enabledTranslations.findIndex(
+    (existing) => canonicalTranslationRank(existing) > rank,
+  );
+  if (index < 0) index = state.enabledTranslations.length;
+  state.enabledTranslations.splice(index, 0, id);
   saveState();
   renderTranslationControls();
   applyVerseLayout();
@@ -441,6 +491,15 @@ function addTranslation(id) {
 function removeTranslation(id) {
   if (!state.enabledTranslations.includes(id)) return;
   state.enabledTranslations = state.enabledTranslations.filter((item) => item !== id);
+  saveState();
+  renderTranslationControls();
+  applyVerseLayout();
+}
+
+function moveTranslation(from, to) {
+  if (from < 0 || to < 0 || from >= state.enabledTranslations.length || to >= state.enabledTranslations.length) return;
+  const [item] = state.enabledTranslations.splice(from, 1);
+  state.enabledTranslations.splice(to, 0, item);
   saveState();
   renderTranslationControls();
   applyVerseLayout();
@@ -2430,6 +2489,7 @@ searchForm.addEventListener("submit", (event) => {
   runSearch(query);
 });
 portraitLayout.addEventListener("change", schedulePanelLayoutAlignment);
+phonePortraitLayout.addEventListener("change", schedulePanelLayoutAlignment);
 touchPanelToggleLayout.addEventListener("change", schedulePanelLayoutAlignment);
 touchPanelToggleLayout.addEventListener("change", syncTrackFreeScroll);
 
