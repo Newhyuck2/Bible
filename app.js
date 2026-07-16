@@ -346,7 +346,7 @@ function renderTranslationChips() {
   for (const id of enabledTranslationIds()) {
     const meta = translationMeta(id);
     const chip = document.createElement("div");
-    chip.className = "translation-chip selected";
+    chip.className = "translation-chip";
     chip.draggable = true;
     chip.dataset.translation = id;
     chip.setAttribute("aria-label", `${meta.label} translation`);
@@ -460,10 +460,6 @@ function renderTranslationPickerMenu() {
       option.setAttribute("role", "option");
       option.setAttribute("aria-selected", String(isEnabled));
 
-      const check = document.createElement("span");
-      check.className = "picker-check";
-      check.textContent = "✓";
-      check.setAttribute("aria-hidden", "true");
       const label = document.createElement("span");
       label.className = "picker-label";
       label.lang = translationLanguage(id);
@@ -478,7 +474,7 @@ function renderTranslationPickerMenu() {
         else addTranslation(id);
         renderTranslationPickerMenu();
       });
-      option.append(check, label, name);
+      option.append(label, name);
       section.append(option);
     }
     translationPickerMenu.append(section);
@@ -507,11 +503,18 @@ translationPickerToggle.addEventListener("click", () => {
   else if (!openedByThisPress) closeTranslationPicker();
 });
 
-document.addEventListener("pointerdown", (event) => {
-  if (translationPickerMenu.hidden) return;
-  if (translationPicker.contains(event.target)) return;
-  closeTranslationPicker();
-});
+// A press outside the open picker only dismisses it: the tap or click is
+// swallowed so nothing underneath (verse selection, buttons) reacts.
+document.addEventListener(
+  "pointerdown",
+  (event) => {
+    if (translationPickerMenu.hidden) return;
+    if (translationPicker.contains(event.target)) return;
+    closeTranslationPicker();
+    shieldOutsidePress(event);
+  },
+  true,
+);
 
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && !translationPickerMenu.hidden) closeTranslationPicker();
@@ -733,19 +736,54 @@ mobileLayout.addEventListener("change", () => {
   syncTrackFreeScroll();
 });
 
-// A combo opened from its toggle by touch never focuses the input (so the
-// on-screen keyboard stays away); tapping anywhere else closes such a menu,
-// since the input-blur closer only covers keyboard-focused combos.
-document.addEventListener("pointerdown", (event) => {
-  for (const menu of document.querySelectorAll(".combo-menu:not([hidden])")) {
-    const combo = menu.closest(".combo");
-    if (!combo || combo.contains(event.target)) continue;
-    const input = combo.querySelector(".combo-input");
-    if (document.activeElement === input) continue;
-    menu.hidden = true;
-    input?.setAttribute("aria-expanded", "false");
-  }
-});
+// Swallow the press that closed an open dropdown so it cannot reach — and
+// act on — whatever sits underneath (e.g. a verse tap starting copy mode).
+// Only that press's own click is swallowed: a new press or a short timeout
+// disarms the guard.
+function shieldOutsidePress(event) {
+  event.preventDefault();
+  event.stopPropagation();
+  const swallowClick = (clickEvent) => {
+    clickEvent.preventDefault();
+    clickEvent.stopPropagation();
+    disarm();
+  };
+  const disarm = () => {
+    document.removeEventListener("click", swallowClick, true);
+    document.removeEventListener("pointerdown", disarm, true);
+    window.clearTimeout(timer);
+  };
+  document.addEventListener("click", swallowClick, true);
+  document.addEventListener("pointerdown", disarm, true);
+  const timer = window.setTimeout(disarm, 700);
+}
+
+// A press outside an open book/chapter dropdown closes it; the input's text
+// snaps back to the current selection (the combo listens for combo-restore).
+// On touch the press is fully swallowed — it only dismisses the menu.
+document.addEventListener(
+  "pointerdown",
+  (event) => {
+    let closedByTouch = false;
+    for (const menu of document.querySelectorAll(".combo-menu:not([hidden])")) {
+      const combo = menu.closest(".combo");
+      if (!combo || combo.contains(event.target)) continue;
+      const input = combo.querySelector(".combo-input");
+      if (event.pointerType === "touch") closedByTouch = true;
+      if (document.activeElement === input) {
+        // Blur closes the menu, restores the label, and puts the on-screen
+        // keyboard away; on desktop the focus shift does it naturally.
+        if (event.pointerType === "touch") input.blur();
+        continue;
+      }
+      menu.hidden = true;
+      input.setAttribute("aria-expanded", "false");
+      combo.dispatchEvent(new CustomEvent("combo-restore"));
+    }
+    if (closedByTouch) shieldOutsidePress(event);
+  },
+  true,
+);
 
 // The portrait two-row header keeps the "Holy Bible" label only while it
 // fits. The layout toggle sits in the flexible column of the top row, so
@@ -874,7 +912,7 @@ function scrollToPanelIndex(index, behavior = "smooth", activate = true) {
   if (activate && targetState) setActivePanel(targetState.id);
 }
 
-function setupCombobox({ input, toggle, menu, items, selectedValue, matches, onSelect }) {
+function setupCombobox({ input, menu, items, selectedValue, matches, onSelect }) {
   let allItems = items;
   let selected = selectedValue;
   let filtered = [];
@@ -938,12 +976,15 @@ function setupCombobox({ input, toggle, menu, items, selectedValue, matches, onS
     menu.scrollTop = option.offsetTop - (menu.clientHeight - option.offsetHeight) / 2;
   }
 
-  function open(selectText = false) {
-    render(selectText ? "" : input.value === selectedItem()?.label ? "" : input.value);
+  // Opening fresh empties the input (ready to type) and shows the full list
+  // scrolled so the current selection sits centered; the selection itself is
+  // kept and snaps back if the menu is left without choosing.
+  function open(clearText = false) {
+    if (clearText) input.value = "";
+    render(clearText ? "" : input.value === selectedItem()?.label ? "" : input.value);
     menu.hidden = false;
     input.setAttribute("aria-expanded", "true");
     centerHighlighted();
-    if (selectText && document.activeElement === input) input.select();
   }
 
   // After a touch press-drag pick, the browser may still deliver the tap's
@@ -951,7 +992,6 @@ function setupCombobox({ input, toggle, menu, items, selectedValue, matches, onS
   // from.
   let suppressReopenUntil = 0;
   const reopenSuppressed = () => Date.now() < suppressReopenUntil;
-  let toggleByTouch = false;
 
   input.addEventListener("focus", () => {
     if (!reopenSuppressed()) open(true);
@@ -978,7 +1018,6 @@ function setupCombobox({ input, toggle, menu, items, selectedValue, matches, onS
     } else if (event.key === "Escape") {
       close();
       input.value = selectedItem()?.label ?? "";
-      input.select();
     }
   });
   input.addEventListener("blur", () => {
@@ -987,32 +1026,28 @@ function setupCombobox({ input, toggle, menu, items, selectedValue, matches, onS
       input.value = selectedItem()?.label ?? "";
     }, 100);
   });
-  toggle.addEventListener("pointerdown", (event) => {
-    toggleByTouch = event.pointerType === "touch";
-  });
-  toggle.addEventListener("click", () => {
-    if (reopenSuppressed()) return;
-    // Touch keeps the on-screen keyboard away: pick from the list instead.
-    if (!toggleByTouch) input.focus();
-    open(true);
+  setupPressDragPick({
+    opener: input,
+    menu,
+    optionSelector: ".combo-option",
+    onOpen: () => {
+      if (menu.hidden) open(true);
+    },
+    onPick: (option) => option.click(),
+    onGestureEnd: (picked) => {
+      suppressReopenUntil = Date.now() + 500;
+      if (!picked && document.activeElement !== input) {
+        close();
+        input.value = selectedItem()?.label ?? "";
+      }
+    },
   });
 
-  const attachPressDragPick = (opener) =>
-    setupPressDragPick({
-      opener,
-      menu,
-      optionSelector: ".combo-option",
-      onOpen: () => {
-        if (menu.hidden) open(true);
-      },
-      onPick: (option) => option.click(),
-      onGestureEnd: (picked) => {
-        suppressReopenUntil = Date.now() + 500;
-        if (!picked && document.activeElement !== input) close();
-      },
-    });
-  attachPressDragPick(toggle);
-  attachPressDragPick(input);
+  // The outside-press closer (see the document pointerdown listener) asks
+  // the combo to put the selected label back after it hides the menu.
+  input.closest(".combo").addEventListener("combo-restore", () => {
+    input.value = selectedItem()?.label ?? "";
+  });
 
   choose(selectedItem(), false);
   close();
@@ -1225,7 +1260,6 @@ function createPanelElement(panelState, shouldScroll = false) {
   let chapterCombo;
   const bookCombo = setupCombobox({
     input: bookInput,
-    toggle: fragment.querySelector(".book-combo .combo-toggle"),
     menu: fragment.querySelector(".book-combo .combo-menu"),
     items: bookItems,
     selectedValue: panelState.book,
@@ -1241,7 +1275,6 @@ function createPanelElement(panelState, shouldScroll = false) {
   });
   chapterCombo = setupCombobox({
     input: chapterInput,
-    toggle: fragment.querySelector(".chapter-combo .combo-toggle"),
     menu: fragment.querySelector(".chapter-combo .combo-menu"),
     items: chapterItems(panelState.book),
     selectedValue: panelState.chapter,
@@ -2066,7 +2099,7 @@ async function copySelectedVerses() {
   const translations = [...copyTranslations.querySelectorAll(".copy-translation-option.selected")]
     .map((item) => item.dataset.translation);
   if (!translations.length) {
-    copyStatus.textContent = "Select a translation.";
+    copyStatus.textContent = "Select a version.";
     return;
   }
   const order = copyDialog.querySelector('input[name="copy-order"]:checked').value;

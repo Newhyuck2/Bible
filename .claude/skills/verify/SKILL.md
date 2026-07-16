@@ -24,10 +24,11 @@ Drive it headlessly with Python Playwright (`pip install playwright; python -m p
 - Wait for `.verse-group` after navigation before interacting.
 
 Gotchas:
-- The translation picker menu is tall; a "tap outside to close" must land well
-  below it (e.g. 370,800 on a phone) or use Escape.
-- The chapter input's center is covered by its ⌄ toggle on phones; tap it with
-  `position={"x": 8, "y": 15}`.
+- The translation picker menu and combo menus are tall; any "tap/click outside
+  to close" (or verse-tap) test point must be computed to land clear of the
+  open menu's bounding box, or use Escape. An outside press while a menu is
+  open is intentionally swallowed (it only closes the menu), so expect the
+  first tap after opening a menu to have no other effect.
 - After changing data.db run `python scripts/export_data.py`, and bump the
   asset version in index.html + search-worker.js + version.json together
   (mismatch shows a permanent refresh banner).
