@@ -15,6 +15,7 @@ const TRANSLATION_GROUPS = [
   { label: "Korean", ids: ["GAE", "SAENEW", "WLB"] },
   { label: "Chinese", ids: ["CNV"] },
 ];
+const TRANSLATION_CANONICAL_ORDER = TRANSLATION_GROUPS.flatMap((group) => group.ids);
 const ASSET_VERSION = document.querySelector('meta[name="asset-version"]').content;
 const MOBILE_LAYOUT_QUERY = "(max-width: 820px), (max-width: 1366px) and (any-pointer: coarse)";
 const mobileLayout = window.matchMedia(MOBILE_LAYOUT_QUERY);
@@ -413,9 +414,17 @@ function renderTranslationChips() {
   }
 }
 
+// A newly picked version slots into the canonical ESV→NIV→KJV→NASB→NRSV→
+// 개역개정→새번역→우리말→新译本 order (before the first chip that ranks
+// after it), rather than appending at the end.
 function addTranslation(id) {
   if (!translationMeta(id) || state.enabledTranslations.includes(id)) return;
-  state.enabledTranslations.push(id);
+  const rank = TRANSLATION_CANONICAL_ORDER.indexOf(id);
+  let index = state.enabledTranslations.findIndex(
+    (existing) => TRANSLATION_CANONICAL_ORDER.indexOf(existing) > rank,
+  );
+  if (index < 0) index = state.enabledTranslations.length;
+  state.enabledTranslations.splice(index, 0, id);
   saveState();
   renderTranslationControls();
   applyVerseLayout();
@@ -1017,7 +1026,10 @@ function setupCombobox({ input, menu, items, selectedValue, matches, onSelect })
   const reopenSuppressed = () => Date.now() < suppressReopenUntil;
 
   input.addEventListener("focus", () => {
-    if (!reopenSuppressed()) open(true);
+    // The tap that focuses the input already opened the menu on pointerdown;
+    // re-rendering here would replace the option nodes under an already
+    // started drag, killing the menu's very first scroll gesture.
+    if (!reopenSuppressed() && menu.hidden) open(true);
   });
   input.addEventListener("click", () => {
     if (!reopenSuppressed() && menu.hidden) open(true);
@@ -1087,6 +1099,37 @@ function setupCombobox({ input, menu, items, selectedValue, matches, onSelect })
   };
 }
 
+// Momentum for the continuous touch pan on desktop-like layouts: the track
+// keeps gliding with the finger's release velocity (px per ms) and decays.
+let panelGlideFrame = 0;
+
+function cancelPanelGlide() {
+  cancelAnimationFrame(panelGlideFrame);
+  panelGlideFrame = 0;
+}
+
+function startPanelGlide(velocity) {
+  cancelPanelGlide();
+  if (!Number.isFinite(velocity) || Math.abs(velocity) < 0.08 || reducedMotion.matches) return;
+  let speed = Math.max(-4, Math.min(velocity, 4));
+  let previous = performance.now();
+  const step = (now) => {
+    panelGlideFrame = 0;
+    const elapsed = Math.min(now - previous, 40);
+    previous = now;
+    panelTrack.scrollLeft += speed * elapsed;
+    speed *= 0.95 ** (elapsed / 16);
+    const maxScroll = Math.max(0, panelTrack.scrollWidth - panelTrack.clientWidth);
+    if (Math.abs(speed) < 0.04 || panelTrack.scrollLeft <= 0 || panelTrack.scrollLeft >= maxScroll) return;
+    panelGlideFrame = requestAnimationFrame(step);
+  };
+  panelGlideFrame = requestAnimationFrame(step);
+}
+
+// Horizontal touch drags on the reading surface pan the track by hand (CSS
+// touch-action reserves the horizontal axis for us). Phone portrait pages
+// exactly one panel per swipe; every other touch layout pans continuously,
+// like dragging the PC view, with momentum on release.
 function setupPanelSwipe(panel, content) {
   let gesture = null;
   let suppressClick = false;
@@ -1104,14 +1147,13 @@ function setupPanelSwipe(panel, content) {
   }, true);
 
   content.addEventListener("touchstart", (event) => {
+    cancelPanelGlide();
     if (event.touches.length !== 1) {
       gesture = null;
       document.body.classList.remove("swiping-panels");
       return;
     }
-    // Only phone portrait pages one panel per swipe; desktop-like layouts
-    // scroll the track natively and continuously.
-    if (desktopLikePanels() || !mobileLayout.matches || state.panels.length < 2) return;
+    if (!mobileLayout.matches || state.panels.length < 2) return;
     const touch = event.touches[0];
     gesture = {
       touchId: touch.identifier,
@@ -1120,6 +1162,7 @@ function setupPanelSwipe(panel, content) {
       startScrollLeft: panelTrack.scrollLeft,
       startIndex: panelIndexAtViewportStart(),
       axis: null,
+      samples: [{ time: performance.now(), x: touch.clientX }],
     };
   }, { passive: true });
 
@@ -1149,6 +1192,11 @@ function setupPanelSwipe(panel, content) {
     event.preventDefault();
     document.body.classList.add("swiping-panels");
     panelTrack.scrollLeft = gesture.startScrollLeft - deltaX;
+    const now = performance.now();
+    gesture.samples.push({ time: now, x: touch.clientX });
+    while (gesture.samples.length > 8 || now - gesture.samples[0].time > 160) {
+      gesture.samples.shift();
+    }
   }, { passive: false });
 
   const finish = (event, cancelled = false) => {
@@ -1156,14 +1204,24 @@ function setupPanelSwipe(panel, content) {
     const touch = findTouch(event.changedTouches, gesture.touchId);
     if (!touch) return;
     if (gesture.axis === "horizontal") {
-      const deltaX = touch.clientX - gesture.startX;
-      const threshold = Math.min(70, panel.clientWidth * 0.18);
-      let targetIndex = gesture.startIndex;
-      if (!cancelled && Math.abs(deltaX) >= threshold) {
-        targetIndex += deltaX < 0 ? 1 : -1;
+      if (desktopLikePanels()) {
+        // Continuous pan: carry the release velocity into a glide.
+        const samples = gesture.samples;
+        const first = samples[0];
+        const last = samples[samples.length - 1];
+        if (!cancelled && first && last && last.time > first.time) {
+          startPanelGlide(-(last.x - first.x) / (last.time - first.time));
+        }
+      } else {
+        const deltaX = touch.clientX - gesture.startX;
+        const threshold = Math.min(70, panel.clientWidth * 0.18);
+        let targetIndex = gesture.startIndex;
+        if (!cancelled && Math.abs(deltaX) >= threshold) {
+          targetIndex += deltaX < 0 ? 1 : -1;
+        }
+        targetIndex = Math.max(0, Math.min(targetIndex, state.panels.length - 1));
+        scrollToPanelIndex(targetIndex);
       }
-      targetIndex = Math.max(0, Math.min(targetIndex, state.panels.length - 1));
-      scrollToPanelIndex(targetIndex);
 
       suppressClick = true;
       window.setTimeout(() => {

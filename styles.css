@@ -2464,16 +2464,13 @@ body * {
 }
 
 /* Phones in landscape and tablets run the exact desktop panel mechanism:
-   pixel widths from the 1/2/fit presets, free continuous scrolling, and
-   native horizontal panning (a drag on the text pans the track). */
+   pixel widths from the 1/2/fit presets and free continuous scrolling.
+   Horizontal drags are driven by the swipe handler (touch-action pan-y
+   keeps that axis cancelable), which pans the track with momentum. */
 @media (orientation: landscape) and (max-width: 1366px) and (any-pointer: coarse),
   (min-width: 600px) and (max-width: 1366px) and (any-pointer: coarse) {
   .panel-track {
     scroll-snap-type: none;
-  }
-
-  .panel-content {
-    touch-action: auto;
   }
 }
 
