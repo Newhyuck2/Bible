@@ -2832,16 +2832,17 @@ body * {
   white-space: nowrap;
 }
 
-.selection-mode-button.selected {
-  border-color: #9abdad;
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-
 .selection-mode-button:hover,
 .cancel-selection:hover {
   border-color: #9d968b;
   background: #f8f6f1;
+}
+
+.selection-mode-button.selected,
+.selection-mode-button.selected:hover {
+  border-color: #9abdad;
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .panel-track.panel-reorder-active {
@@ -3266,13 +3267,25 @@ html[data-verse-layout="columns"] .translation-label {
 }
 
 .translation-picker-option.selected {
-  background: #eaf5ef;
-  box-shadow: inset 0 0 0 1px rgba(47, 118, 99, 0.12);
+  background: transparent;
+  box-shadow: none;
 }
 
 .translation-picker-option.selected.highlighted,
 .translation-picker-option.selected:hover {
   background: var(--accent-soft);
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .translation-picker-option:hover,
+  .translation-picker-option.selected:hover {
+    background: transparent;
+  }
+
+  .translation-picker-option.highlighted,
+  .translation-picker-option.selected.highlighted {
+    background: var(--accent-soft);
+  }
 }
 
 .translation-picker-option:focus-visible {

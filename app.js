@@ -723,7 +723,6 @@ function setupTouchReorder({ item, handle, container, itemClass, id, getOrder, o
 function setupPressDragPick({ opener, menu, optionSelector, onOpen, onPick, onGestureEnd }) {
   opener.addEventListener("pointerdown", (event) => {
     if (event.pointerType !== "touch") return;
-    event.preventDefault();
     onOpen?.();
     const pointerId = event.pointerId;
     const startX = event.clientX;
@@ -1171,6 +1170,7 @@ function setupCombobox({ input, menu, items, selectedValue, matches, onSelect })
     menu,
     optionSelector: ".combo-option",
     onOpen: () => {
+      suppressReopenUntil = Date.now() + 500;
       if (menu.hidden) open(true);
     },
     onPick: (option) => option.click(),
