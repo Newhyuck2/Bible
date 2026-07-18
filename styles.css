@@ -2190,6 +2190,12 @@ body * {
     -webkit-overflow-scrolling: touch;
   }
 
+  .combo-option {
+    min-height: 28px;
+    padding: 3px 7px;
+    line-height: 1.2;
+  }
+
   .book-combo .combo-menu {
     width: min(260px, calc(100vw - 24px));
     min-width: 0;
@@ -2823,13 +2829,22 @@ body * {
   stroke-width: 2;
 }
 
-.selection-mode-label {
+.selection-bars {
+  display: grid;
+  width: 18px;
+  gap: 1px;
+}
+
+.selection-bars span {
   display: block;
-  color: currentColor;
-  font-size: 9px;
-  font-weight: 900;
-  line-height: 1;
-  white-space: nowrap;
+  width: 18px;
+  height: 6px;
+  border: 1px solid #85817a;
+  background: #85817a;
+}
+
+.selection-bars-gap span:nth-child(2) {
+  background: white;
 }
 
 .selection-mode-button:hover,
@@ -2899,8 +2914,13 @@ body * {
     height: 19px;
   }
 
-  .selection-mode-label {
-    font-size: 10px;
+  .selection-bars {
+    width: 21px;
+  }
+
+  .selection-bars span {
+    width: 21px;
+    height: 7px;
   }
 }
 
