@@ -222,18 +222,6 @@ function panelAvailableWidth() {
   return Math.max(1, panelTrack.clientWidth - horizontalPadding);
 }
 
-// Width for `count` side-by-side panels; multi-panel widths sit slightly
-// under an exact division so the set plus its gaps always fits inside one
-// screen without a horizontal scrollbar.
-function desktopPanelFitWidth(count) {
-  const gap = Number.parseFloat(getComputedStyle(panelTrack).columnGap) || 0;
-  const available = maximumPanelWidth();
-  const width = count > 1
-    ? Math.floor((available - gap * (count - 1)) / count) - 2
-    : Math.floor(available);
-  return Math.max(320, width);
-}
-
 function exactPanelFitWidth(count) {
   const gap = Number.parseFloat(getComputedStyle(panelTrack).columnGap) || 0;
   return Math.max(1, (panelAvailableWidth() - gap * (count - 1)) / count);
@@ -267,9 +255,7 @@ function resetPanelWidths() {
 function applyDesktopPanelWidths() {
   if (!state?.desktopPanelMode) return;
   const count = state.desktopPanelMode === 2 ? 2 : 1;
-  setAllDesktopPanelWidths(
-    touchPanelToggleLayout.matches ? exactPanelFitWidth(count) : desktopPanelFitWidth(count),
-  );
+  setAllDesktopPanelWidths(exactPanelFitWidth(count));
 }
 
 function setDesktopPanelMode(mode) {
@@ -389,7 +375,7 @@ function resetSite() {
     if (touchPanelToggleLayout.matches) state.desktopPanelMode = 2;
     state.panels[0].width = touchPanelToggleLayout.matches
       ? exactPanelFitWidth(state.desktopPanelMode === 2 ? 2 : 1)
-      : desktopPanelFitWidth(2);
+      : exactPanelFitWidth(2);
   }
   applyTouchPanelCount();
   activePanelId = undefined;
@@ -939,6 +925,36 @@ scheduleBrandLabelUpdate();
 // toward each frame.
 let headerPanTarget = null;
 let headerPanFrame = 0;
+let desktopPanelSnapTimer = 0;
+let desktopPanelSnapping = false;
+
+function shouldSnapDesktopPanels() {
+  return !mobileLayout.matches && Boolean(state?.desktopPanelMode);
+}
+
+function scheduleDesktopPanelSnap(delay = 140) {
+  if (!shouldSnapDesktopPanels() || desktopPanelSnapping) return;
+  window.clearTimeout(desktopPanelSnapTimer);
+  desktopPanelSnapTimer = window.setTimeout(snapDesktopPanelsToNearest, delay);
+}
+
+function snapDesktopPanelsToNearest() {
+  desktopPanelSnapTimer = 0;
+  if (!shouldSnapDesktopPanels() || desktopPanelSnapping) return;
+  if (headerPanTarget != null || headerPanFrame) {
+    scheduleDesktopPanelSnap(120);
+    return;
+  }
+  const targetLeft = panelScrollLeft(panelIndexAtViewportStart());
+  if (Math.abs(panelTrack.scrollLeft - targetLeft) <= 1) {
+    panelTrack.scrollTo({ left: targetLeft, behavior: "instant" });
+    return;
+  }
+  desktopPanelSnapping = true;
+  animateTrackScroll(targetLeft, 220, () => {
+    desktopPanelSnapping = false;
+  });
+}
 
 function stepHeaderPan() {
   headerPanFrame = 0;
@@ -948,6 +964,7 @@ function stepHeaderPan() {
   if (Math.abs(remaining) <= 1) {
     panelTrack.scrollTo({ left: headerPanTarget, behavior: "instant" });
     headerPanTarget = null;
+    scheduleDesktopPanelSnap(80);
     return;
   }
   const step = Math.sign(remaining) * Math.max(1, Math.abs(remaining) * 0.16);
@@ -979,6 +996,7 @@ document.addEventListener(
     if (reducedMotion.matches) {
       panelTrack.scrollTo({ left: headerPanTarget, behavior: "instant" });
       headerPanTarget = null;
+      scheduleDesktopPanelSnap(80);
       return;
     }
     if (!headerPanFrame) headerPanFrame = requestAnimationFrame(stepHeaderPan);
@@ -993,10 +1011,28 @@ window.addEventListener("resize", () => {
   if (!desktopLikePanels() || !state?.desktopPanelMode) return;
   window.clearTimeout(desktopModeResizeTimer);
   desktopModeResizeTimer = window.setTimeout(() => {
+    const alignmentIndex = panelIndexAtViewportStart();
     applyDesktopPanelWidths();
+    alignPanelsAfterLayoutChange(alignmentIndex);
     saveState();
   }, 150);
 });
+
+panelTrack.addEventListener(
+  "scroll",
+  () => {
+    if (
+      desktopPanelSnapping
+      || headerPanTarget != null
+      || panelTrack.classList.contains("panel-count-changing")
+      || panelTrack.classList.contains("removing-panel")
+    ) {
+      return;
+    }
+    scheduleDesktopPanelSnap();
+  },
+  { passive: true },
+);
 
 function panelScrollLeft(index) {
   const panelState = state.panels[index];
