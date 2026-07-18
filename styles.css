@@ -2185,7 +2185,7 @@ body * {
   }
 
   .combo-menu {
-    max-height: min(260px, 42dvh);
+    max-height: min(418px, 72dvh);
     overscroll-behavior-y: contain;
     -webkit-overflow-scrolling: touch;
   }

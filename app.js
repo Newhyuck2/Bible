@@ -1106,6 +1106,12 @@ function setupCombobox({ input, menu, items, selectedValue, matches, onSelect })
 
   let menuPointerActive = false;
 
+  input.addEventListener("pointerdown", (event) => {
+    if (event.pointerType !== "touch" || !mobileLayout.matches) return;
+    event.preventDefault();
+    if (menu.hidden) open(true);
+    input.blur();
+  });
   input.addEventListener("focus", () => {
     if (menu.hidden) open(true);
   });
