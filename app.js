@@ -1104,21 +1104,13 @@ function setupCombobox({ input, menu, items, selectedValue, matches, onSelect })
     centerHighlighted();
   }
 
-  // After a touch press-drag pick, the browser may still deliver the tap's
-  // focus/click to the opener; those must not reopen the menu just chosen
-  // from.
-  let suppressReopenUntil = 0;
   let menuPointerActive = false;
-  const reopenSuppressed = () => Date.now() < suppressReopenUntil;
 
   input.addEventListener("focus", () => {
-    // The tap that focuses the input already opened the menu on pointerdown;
-    // re-rendering here would replace the option nodes under an already
-    // started drag, killing the menu's very first scroll gesture.
-    if (!reopenSuppressed() && menu.hidden) open(true);
+    if (menu.hidden) open(true);
   });
   input.addEventListener("click", () => {
-    if (!reopenSuppressed() && menu.hidden) open(true);
+    if (menu.hidden) open(true);
   });
   input.addEventListener("input", () => {
     render(input.value);
@@ -1165,24 +1157,6 @@ function setupCombobox({ input, menu, items, selectedValue, matches, onSelect })
     document.addEventListener("pointerup", release, true);
     document.addEventListener("pointercancel", release, true);
   });
-  setupPressDragPick({
-    opener: input,
-    menu,
-    optionSelector: ".combo-option",
-    onOpen: () => {
-      suppressReopenUntil = Date.now() + 500;
-      if (menu.hidden) open(true);
-    },
-    onPick: (option) => option.click(),
-    onGestureEnd: (picked) => {
-      suppressReopenUntil = Date.now() + 500;
-      if (!picked && document.activeElement !== input) {
-        close();
-        input.value = selectedItem()?.label ?? "";
-      }
-    },
-  });
-
   // The outside-press closer (see the document pointerdown listener) asks
   // the combo to put the selected label back after it hides the menu.
   input.closest(".combo").addEventListener("combo-restore", () => {
