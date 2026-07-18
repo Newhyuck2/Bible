@@ -2835,7 +2835,7 @@ body * {
   height: 17px;
   align-content: center;
   justify-items: center;
-  gap: 1px;
+  gap: 2px;
 }
 
 .selection-bars span {
@@ -2847,8 +2847,8 @@ body * {
   background: linear-gradient(#918b82, #757068);
 }
 
-.selection-bars-gap {
-  gap: 3px;
+.selection-bars-gap span:nth-child(2) {
+  background: white;
 }
 
 .selection-mode-button:hover,
