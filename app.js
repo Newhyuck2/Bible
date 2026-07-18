@@ -50,7 +50,6 @@ const fontSizeUpButton = document.querySelector("#font-size-up");
 const fontSizeValue = document.querySelector("#font-size-value");
 const panelCountOneButton = document.querySelector("#panel-count-one");
 const panelCountTwoButton = document.querySelector("#panel-count-two");
-const panelFitVisibleButton = document.querySelector("#panel-fit-visible");
 const verseLayoutStackedButton = document.querySelector("#verse-layout-stacked");
 const verseLayoutColumnsButton = document.querySelector("#verse-layout-columns");
 const copyDialog = document.querySelector("#copy-dialog");
@@ -88,6 +87,7 @@ function freshState() {
     touchPanelCount: null,
     desktopPanelMode: null,
     verseLayout: "stacked",
+    copySelectionMode: "range",
     panels: [{ book: 0, chapter: 1 }],
   };
 }
@@ -115,6 +115,7 @@ function sanitizeState() {
   state.enabledTranslations = [...new Set(enabled)];
   state.fontSize = Math.max(10, Math.min(Number(state.fontSize) || 14, 22));
   state.verseLayout = state.verseLayout === "columns" ? "columns" : "stacked";
+  state.copySelectionMode = state.copySelectionMode === "individual" ? "individual" : "range";
   const savedPanelCount = Number(state.touchPanelCount);
   state.touchPanelCount = phonePortraitLayout.matches
     ? 1
@@ -122,7 +123,9 @@ function sanitizeState() {
     ? savedPanelCount
     : landscapeMobile.matches ? 2 : 1;
   const savedDesktopMode = Number(state.desktopPanelMode);
-  state.desktopPanelMode = savedDesktopMode === 1 || savedDesktopMode === 2 ? savedDesktopMode : null;
+  state.desktopPanelMode = savedDesktopMode === 1 || savedDesktopMode === 2
+    ? savedDesktopMode
+    : touchPanelToggleLayout.matches ? 2 : null;
   state.panels = state.panels
     .map((panel) => {
       const book = Math.max(0, Math.min(Number(panel.book) || 0, manifest.books.length - 1));
@@ -143,6 +146,7 @@ function saveState() {
       touchPanelCount: state.touchPanelCount,
       desktopPanelMode: state.desktopPanelMode,
       verseLayout: state.verseLayout,
+      copySelectionMode: state.copySelectionMode,
       panels: state.panels.map(({ book, chapter, width }) => ({ book, chapter, width })),
     }),
   );
@@ -209,7 +213,6 @@ function updatePanelCountControls() {
   panelCountTwoButton.classList.toggle("selected", twoSelected);
   panelCountOneButton.setAttribute("aria-pressed", String(oneSelected));
   panelCountTwoButton.setAttribute("aria-pressed", String(twoSelected));
-  panelFitVisibleButton.disabled = state.panels.length < 2;
 }
 
 function panelAvailableWidth() {
@@ -263,7 +266,10 @@ function resetPanelWidths() {
 
 function applyDesktopPanelWidths() {
   if (!state?.desktopPanelMode) return;
-  setAllDesktopPanelWidths(desktopPanelFitWidth(state.desktopPanelMode === 2 ? 2 : 1));
+  const count = state.desktopPanelMode === 2 ? 2 : 1;
+  setAllDesktopPanelWidths(
+    touchPanelToggleLayout.matches ? exactPanelFitWidth(count) : desktopPanelFitWidth(count),
+  );
 }
 
 function setDesktopPanelMode(mode) {
@@ -273,6 +279,7 @@ function setDesktopPanelMode(mode) {
   applyDesktopPanelWidths();
   updatePanelCountControls();
   saveState();
+  alignPanelsAfterLayoutChange(panelIndexAtViewportStart());
 }
 
 // Manually resizing a panel breaks the uniform widths the desktop one/two
@@ -303,7 +310,7 @@ function visiblePanelSpan() {
 // Desktop fits the panels currently on screen; touch layouts fit every panel
 // into the screen, no matter how many panels are open.
 function fitVisiblePanels() {
-  if (state.panels.length < 2) return;
+  if (mobileLayout.matches || state.panels.length < 2) return;
   const touchLayout = mobileLayout.matches;
   const { first, count: visibleCount } = visiblePanelSpan();
   const count = touchLayout ? state.panels.length : visibleCount;
@@ -357,7 +364,15 @@ function schedulePanelLayoutAlignment() {
   if (!state) return;
   cancelAnimationFrame(panelLayoutFrame);
   const activeIndex = state.panels.findIndex((panelState) => panelState.id === activePanelId);
-  panelLayoutFrame = requestAnimationFrame(() => applyTouchPanelCount(Math.max(0, activeIndex)));
+  panelLayoutFrame = requestAnimationFrame(() => {
+    if (touchPanelToggleLayout.matches) {
+      panelTrack.classList.remove("fit-all-panels");
+      if (state.desktopPanelMode !== 1 && state.desktopPanelMode !== 2) state.desktopPanelMode = 2;
+      applyDesktopPanelWidths();
+      saveState();
+    }
+    applyTouchPanelCount(Math.max(0, activeIndex));
+  });
 }
 
 function resetSite() {
@@ -371,13 +386,17 @@ function resetSite() {
   state = freshState();
   sanitizeState();
   if (desktopLikePanels()) {
-    state.panels[0].width = desktopPanelFitWidth(2);
+    if (touchPanelToggleLayout.matches) state.desktopPanelMode = 2;
+    state.panels[0].width = touchPanelToggleLayout.matches
+      ? exactPanelFitWidth(state.desktopPanelMode === 2 ? 2 : 1)
+      : desktopPanelFitWidth(2);
   }
   applyTouchPanelCount();
   activePanelId = undefined;
   applyFontSize();
   renderTranslationControls();
   for (const panel of state.panels) createPanelElement(panel);
+  if (desktopLikePanels()) applyDesktopPanelWidths();
   saveState();
 
   searchInput.value = "";
@@ -1211,6 +1230,14 @@ function startPanelGlide(velocity) {
   panelGlideFrame = requestAnimationFrame(step);
 }
 
+function snapTouchPanelsAfterSwipe() {
+  if (!touchPanelToggleLayout.matches || !state?.desktopPanelMode) return false;
+  cancelPanelGlide();
+  const targetIndex = panelIndexAtViewportStart();
+  animateTrackScroll(panelScrollLeft(targetIndex), 220);
+  return true;
+}
+
 // Horizontal touch drags on a panel pan the track by hand, following the
 // finger position directly with momentum on release.
 function setupPanelSwipe(panel) {
@@ -1293,7 +1320,9 @@ function setupPanelSwipe(panel) {
       const samples = gesture.samples;
       const first = samples[0];
       const last = samples[samples.length - 1];
-      if (!cancelled && first && last && last.time > first.time) {
+      if (snapTouchPanelsAfterSwipe()) {
+        // The one/two-panel touch presets always land on a panel edge.
+      } else if (!cancelled && first && last && last.time > first.time) {
         startPanelGlide(-(last.x - first.x) / (last.time - first.time));
       }
 
@@ -1315,6 +1344,11 @@ function chapterItems(bookIndex) {
     value: index + 1,
     label: String(index + 1),
   }));
+}
+
+function verseItems(panelState) {
+  const verses = panelState.data?.v?.map(([verse]) => Number(verse)).filter(Number.isFinite) ?? [1];
+  return verses.map((verse) => ({ value: verse, label: String(verse) }));
 }
 
 function maximumPanelWidth() {
@@ -1383,8 +1417,11 @@ function createPanelElement(panelState, shouldScroll = false) {
   const header = fragment.querySelector(".panel-header");
   const bookInput = fragment.querySelector(".book-input");
   const chapterInput = fragment.querySelector(".chapter-input");
+  const verseInput = fragment.querySelector(".verse-input");
   const content = fragment.querySelector(".panel-content");
   const copy = fragment.querySelector(".copy-selection");
+  const selectionModeRange = fragment.querySelector(".selection-mode-range");
+  const selectionModeIndividual = fragment.querySelector(".selection-mode-individual");
   const cancelSelection = fragment.querySelector(".cancel-selection");
   const remove = fragment.querySelector(".remove-panel");
   const panelNumber = fragment.querySelector(".panel-number");
@@ -1397,6 +1434,9 @@ function createPanelElement(panelState, shouldScroll = false) {
   panel.dataset.panelId = id;
   panelState.selectionAnchor = null;
   panelState.selectionEnd = null;
+  panelState.selectedVerses = new Set();
+  panelState.selectionMode = state.copySelectionMode;
+  panelState.verse = Number(panelState.verse) || 1;
   if (panelState.width) {
     const renderedWidth = desktopLikePanels()
       ? Math.min(panelState.width, maximumPanelWidth())
@@ -1413,6 +1453,7 @@ function createPanelElement(panelState, shouldScroll = false) {
     en: book.en,
   }));
   let chapterCombo;
+  let verseCombo;
   const bookCombo = setupCombobox({
     input: bookInput,
     menu: fragment.querySelector(".book-combo .combo-menu"),
@@ -1422,8 +1463,11 @@ function createPanelElement(panelState, shouldScroll = false) {
     onSelect: (book) => {
       panelState.book = book;
       panelState.chapter = 1;
+      panelState.verse = 1;
       chapterCombo.setItems(chapterItems(book));
       chapterCombo.setValue(1);
+      verseCombo.setItems([{ value: 1, label: "1" }]);
+      verseCombo.setValue(1);
       saveState();
       loadPanel(panelState);
     },
@@ -1436,11 +1480,28 @@ function createPanelElement(panelState, shouldScroll = false) {
     matches: (item, query) => !query.trim() || item.label.startsWith(query.trim()),
     onSelect: (chapter) => {
       panelState.chapter = chapter;
+      panelState.verse = 1;
+      verseCombo.setItems([{ value: 1, label: "1" }]);
+      verseCombo.setValue(1);
       saveState();
       loadPanel(panelState);
     },
   });
+  verseCombo = setupCombobox({
+    input: verseInput,
+    menu: fragment.querySelector(".verse-combo .combo-menu"),
+    items: [{ value: panelState.verse, label: String(panelState.verse) }],
+    selectedValue: panelState.verse,
+    matches: (item, query) => !query.trim() || item.label.startsWith(query.trim()),
+    onSelect: (verse) => {
+      panelState.verse = verse;
+      updatePanelControls(panelState);
+      scrollVerseToTop(panelState, verse);
+    },
+  });
   copy.addEventListener("click", () => openCopyDialog(panelState));
+  selectionModeRange.addEventListener("click", () => setPanelSelectionMode(panelState, "range"));
+  selectionModeIndividual.addEventListener("click", () => setPanelSelectionMode(panelState, "individual"));
   cancelSelection.addEventListener("click", () => clearPanelSelection(panelState));
   remove.addEventListener("click", () => removePanel(id));
   moveLeft.addEventListener("click", (event) => {
@@ -1456,15 +1517,17 @@ function createPanelElement(panelState, shouldScroll = false) {
   setupPanelResize(panel, resizeHandle, panelState);
   setupPanelMoveReveal(panel, moveLeft, moveRight);
   setupPanelSwipe(panel);
-  setupTouchPanelLongPress(panel, panelState);
 
   panelElements.set(id, {
     panel,
     header,
     bookCombo,
     chapterCombo,
+    verseCombo,
     content,
     copy,
+    selectionModeRange,
+    selectionModeIndividual,
     cancelSelection,
     remove,
     panelNumber,
@@ -1658,148 +1721,6 @@ function movePanel(from, to, { animate = true } = {}) {
   }
 }
 
-// In a two-panel touch layout, holding the reading surface lifts a panel.
-// Only the two panels currently visible can swap with each other.
-function setupTouchPanelLongPress(panel, panelState) {
-  let gesture = null;
-  let suppressClickUntil = 0;
-  const findTouch = (touches, id) => {
-    for (let index = 0; index < touches.length; index += 1) {
-      if (touches[index].identifier === id) return touches[index];
-    }
-    return null;
-  };
-  const cancelGesture = () => {
-    if (!gesture) return;
-    window.clearTimeout(gesture.timer);
-    const wasActive = gesture.active;
-    gesture = null;
-    if (!wasActive) return;
-    panel.classList.remove("panel-longpress-dragging");
-    panel.style.transform = "";
-    panelTrack.classList.remove("panel-reorder-active");
-    document.body.classList.remove("reordering-chip");
-    for (const { panel: candidate } of panelElements.values()) candidate.classList.remove("drop-target");
-  };
-
-  panel.addEventListener("click", (event) => {
-    if (Date.now() >= suppressClickUntil) return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
-  }, true);
-
-  panel.addEventListener("touchstart", (event) => {
-    if (event.touches.length !== 1) {
-      cancelGesture();
-      return;
-    }
-    if (!touchPanelToggleLayout.matches || !isTwoPanelTouchMode()) return;
-    if (panelMutationInProgress || state.panels.length < 2) return;
-    if (event.target.closest("button, input, .combo-menu, .panel-resize-handle")) return;
-
-    const touch = event.touches[0];
-    const touchId = touch.identifier;
-    const pairStart = Math.min(panelIndexAtViewportStart(), Math.max(0, state.panels.length - 2));
-    gesture = {
-      touchId,
-      startX: touch.clientX,
-      startY: touch.clientY,
-      pairStart,
-      active: false,
-      targetIndex: -1,
-      timer: window.setTimeout(() => {
-        if (!gesture || gesture.touchId !== touchId) return;
-        gesture.active = true;
-        setActivePanel(panelState.id);
-        panel.classList.add("panel-longpress-dragging");
-        panel.style.transform = "scale(0.97)";
-        panelTrack.classList.add("panel-reorder-active");
-        document.body.classList.add("reordering-chip");
-      }, 430),
-    };
-  }, { passive: true });
-
-  panel.addEventListener("touchmove", (event) => {
-    if (!gesture) return;
-    if (event.touches.length !== 1) {
-      cancelGesture();
-      return;
-    }
-    const touch = findTouch(event.touches, gesture.touchId);
-    if (!touch) return;
-    const dx = touch.clientX - gesture.startX;
-    const dy = touch.clientY - gesture.startY;
-    if (!gesture.active) {
-      if (Math.hypot(dx, dy) >= 9) {
-        window.clearTimeout(gesture.timer);
-        gesture = null;
-      }
-      return;
-    }
-
-    event.preventDefault();
-    event.stopPropagation();
-    panel.style.transform = `translateX(${dx}px) scale(0.97)`;
-    const from = state.panels.findIndex((item) => item.id === panelState.id);
-    const pairEnd = gesture.pairStart + 1;
-    const otherVisibleIndex = from === gesture.pairStart
-      ? pairEnd
-      : from === pairEnd
-        ? gesture.pairStart
-        : -1;
-    const requiredDirection = Math.sign(otherVisibleIndex - from);
-    const validTarget = Math.abs(dx) >= 34 && Math.sign(dx) === requiredDirection
-      ? otherVisibleIndex
-      : -1;
-    if (validTarget === gesture.targetIndex) return;
-    if (gesture.targetIndex >= 0) {
-      panelElements.get(state.panels[gesture.targetIndex]?.id)?.panel.classList.remove("drop-target");
-    }
-    gesture.targetIndex = validTarget;
-    if (validTarget >= 0) panelElements.get(state.panels[validTarget].id)?.panel.classList.add("drop-target");
-  }, { passive: false });
-
-  const finish = (event) => {
-    if (!gesture || !findTouch(event.changedTouches, gesture.touchId)) return;
-    window.clearTimeout(gesture.timer);
-    const { active, targetIndex, pairStart } = gesture;
-    gesture = null;
-    if (!active) return;
-
-    event.preventDefault();
-    event.stopPropagation();
-    panel.classList.remove("panel-longpress-dragging");
-    panel.style.transform = "";
-    document.body.classList.remove("reordering-chip");
-    for (const { panel: candidate } of panelElements.values()) candidate.classList.remove("drop-target");
-    suppressClickUntil = Date.now() + 450;
-    if (targetIndex >= 0) {
-      const from = state.panels.findIndex((item) => item.id === panelState.id);
-      movePanel(from, targetIndex, { animate: false });
-      const alignVisiblePair = () => {
-        panelTrack.scrollLeft = panelScrollLeft(pairStart);
-      };
-      alignVisiblePair();
-      requestAnimationFrame(() => {
-        alignVisiblePair();
-        requestAnimationFrame(() => {
-          alignVisiblePair();
-          panelTrack.classList.remove("panel-reorder-active");
-          alignVisiblePair();
-        });
-      });
-    } else {
-      panelTrack.classList.remove("panel-reorder-active");
-    }
-  };
-
-  panel.addEventListener("touchend", finish);
-  panel.addEventListener("touchcancel", finish);
-  panel.addEventListener("contextmenu", (event) => {
-    if (panel.classList.contains("panel-longpress-dragging")) event.preventDefault();
-  });
-}
-
 function movePanelBy(panelState, direction) {
   if (panelMutationInProgress) return;
   const from = state.panels.findIndex((item) => item.id === panelState.id);
@@ -1856,17 +1777,46 @@ function selectionBounds(panelState) {
   ];
 }
 
+function selectedVerseNumbers(panelState) {
+  if (panelState.selectionMode === "individual") {
+    return [...(panelState.selectedVerses ?? new Set())].sort((a, b) => a - b);
+  }
+  const bounds = selectionBounds(panelState);
+  if (!bounds) return [];
+  const [start, end] = bounds;
+  return Array.from({ length: end - start + 1 }, (_, index) => start + index);
+}
+
+function hasVerseSelection(panelState) {
+  return selectedVerseNumbers(panelState).length > 0;
+}
+
+function syncSelectedVersesFromRange(panelState) {
+  panelState.selectedVerses = new Set(selectedVerseNumbers(panelState));
+}
+
+function selectionModeButtonState(elements, mode) {
+  elements.selectionModeRange.classList.toggle("selected", mode === "range");
+  elements.selectionModeIndividual.classList.toggle("selected", mode === "individual");
+  elements.selectionModeRange.setAttribute("aria-pressed", String(mode === "range"));
+  elements.selectionModeIndividual.setAttribute("aria-pressed", String(mode === "individual"));
+}
+
 function updatePanelSelection(panelState) {
   const elements = panelElements.get(panelState.id);
   if (!elements) return;
-  const bounds = selectionBounds(panelState);
+  const selected = new Set(selectedVerseNumbers(panelState));
+  const hasSelection = selected.size > 0;
   elements.content.querySelectorAll(".verse-group").forEach((group) => {
     const verse = Number(group.dataset.verse);
-    group.classList.toggle("selected", Boolean(bounds && verse >= bounds[0] && verse <= bounds[1]));
+    group.classList.toggle("selected", selected.has(verse));
   });
-  elements.panel.classList.toggle("selection-active", Boolean(bounds));
-  elements.copy.hidden = !bounds;
-  elements.cancelSelection.hidden = !bounds;
+  elements.panel.classList.toggle("selection-active", hasSelection);
+  elements.copy.hidden = !hasSelection;
+  elements.selectionModeRange.hidden = !hasSelection;
+  elements.selectionModeIndividual.hidden = !hasSelection;
+  elements.cancelSelection.hidden = !hasSelection;
+  selectionModeButtonState(elements, panelState.selectionMode);
 }
 
 // The floating copy/cancel buttons overlap the bottom edge of the reading
@@ -1892,10 +1842,49 @@ function revealVerseAboveActions(panelState, verse) {
 function clearPanelSelection(panelState) {
   panelState.selectionAnchor = null;
   panelState.selectionEnd = null;
+  panelState.selectedVerses = new Set();
+  updatePanelSelection(panelState);
+}
+
+function setPanelSelectionMode(panelState, mode) {
+  if (mode !== "range" && mode !== "individual") return;
+  const previous = panelState.selectionMode;
+  panelState.selectionMode = mode;
+  state.copySelectionMode = mode;
+  if (mode === "individual" && previous !== "individual") {
+    syncSelectedVersesFromRange(panelState);
+  } else if (mode === "range" && previous !== "range") {
+    const verses = selectedVerseNumbers(panelState);
+    if (verses.length) {
+      panelState.selectionAnchor = verses[0];
+      panelState.selectionEnd = verses[verses.length - 1];
+    }
+    syncSelectedVersesFromRange(panelState);
+  }
+  saveState();
   updatePanelSelection(panelState);
 }
 
 function selectVerse(panelState, verse) {
+  if (!hasVerseSelection(panelState)) {
+    panelState.selectionMode = state.copySelectionMode;
+  }
+  if (panelState.selectionMode === "individual") {
+    if (!panelState.selectedVerses) panelState.selectedVerses = new Set();
+    if (panelState.selectedVerses.has(verse)) panelState.selectedVerses.delete(verse);
+    else panelState.selectedVerses.add(verse);
+    if (panelState.selectedVerses.size) {
+      const verses = selectedVerseNumbers(panelState);
+      panelState.selectionAnchor = verses[0];
+      panelState.selectionEnd = verses[verses.length - 1];
+    } else {
+      panelState.selectionAnchor = null;
+      panelState.selectionEnd = null;
+    }
+    updatePanelSelection(panelState);
+    if (hasVerseSelection(panelState)) revealVerseAboveActions(panelState, verse);
+    return;
+  }
   const bounds = selectionBounds(panelState);
   if (!bounds) {
     panelState.selectionAnchor = verse;
@@ -1911,8 +1900,16 @@ function selectVerse(panelState, verse) {
     panelState.selectionAnchor = verse;
     panelState.selectionEnd = verse;
   }
+  syncSelectedVersesFromRange(panelState);
   updatePanelSelection(panelState);
-  if (selectionBounds(panelState)) revealVerseAboveActions(panelState, verse);
+  if (hasVerseSelection(panelState)) revealVerseAboveActions(panelState, verse);
+}
+
+function scrollVerseToTop(panelState, verse, behavior = "smooth") {
+  const elements = panelElements.get(panelState.id);
+  const group = elements?.content.querySelector(`.verse-group[data-verse="${verse}"]`);
+  if (!group) return;
+  group.scrollIntoView({ behavior: reducedMotion.matches ? "auto" : behavior, block: "start" });
 }
 
 async function loadPanel(panelState, targetVerse = null) {
@@ -1928,12 +1925,10 @@ async function loadPanel(panelState, targetVerse = null) {
     const data = await getChapter(panelState.book, panelState.chapter);
     if (elements.panel.dataset.requestKey !== requestKey) return;
     panelState.data = data;
+    panelState.verse = targetVerse || 1;
     renderPanelBody(panelState);
     if (targetVerse) {
-      requestAnimationFrame(() => {
-        const verse = elements.content.querySelector(`[data-verse="${targetVerse}"]`);
-        verse?.scrollIntoView({ behavior: "smooth", block: "start" });
-      });
+      requestAnimationFrame(() => scrollVerseToTop(panelState, targetVerse));
     } else {
       elements.content.scrollTop = 0;
     }
@@ -1950,7 +1945,7 @@ async function loadPanel(panelState, targetVerse = null) {
 function captureVerseAnchor(content, panelState) {
   const contentRect = content.getBoundingClientRect();
   if (!contentRect.height) return null;
-  const bounds = selectionBounds(panelState);
+  const selected = new Set(selectedVerseNumbers(panelState));
   const middle = contentRect.top + contentRect.height / 2;
   let anchor = null;
   let bestDistance = Number.POSITIVE_INFINITY;
@@ -1958,7 +1953,7 @@ function captureVerseAnchor(content, panelState) {
     const rect = group.getBoundingClientRect();
     if (rect.bottom <= contentRect.top || rect.top >= contentRect.bottom) continue;
     const verse = Number(group.dataset.verse);
-    if (bounds && verse >= bounds[0] && verse <= bounds[1]) {
+    if (selected.has(verse)) {
       return { verse, offset: rect.top - contentRect.top };
     }
     const distance = Math.abs((rect.top + rect.bottom) / 2 - middle);
@@ -2057,6 +2052,11 @@ function updatePanelControls(panelState) {
   elements.bookCombo.setValue(panelState.book);
   elements.chapterCombo.setItems(chapterItems(panelState.book));
   elements.chapterCombo.setValue(panelState.chapter);
+  const verses = verseItems(panelState);
+  const maxVerse = verses.at(-1)?.value ?? 1;
+  panelState.verse = Math.max(1, Math.min(Number(panelState.verse) || 1, maxVerse));
+  elements.verseCombo.setItems(verses);
+  elements.verseCombo.setValue(panelState.verse);
   elements.previous.disabled = panelState.book === 0 && panelState.chapter === 1;
   const finalBook = manifest.books.length - 1;
   elements.next.disabled =
@@ -2132,6 +2132,10 @@ function renderCopyTranslationOptions(checkedTranslations = null) {
     text.textContent = translationMeta(translation).label;
     text.style.setProperty("--translation-color", TRANSLATION_COLORS[translation]);
 
+    const check = document.createElement("span");
+    check.className = "copy-check";
+    check.setAttribute("aria-hidden", "true");
+
     item.addEventListener("dragstart", (event) => {
       item.classList.add("dragging");
       event.dataTransfer.setData("text/plain", translation);
@@ -2161,7 +2165,7 @@ function renderCopyTranslationOptions(checkedTranslations = null) {
       toggleCopyTranslation();
     });
 
-    item.append(handle, text);
+    item.append(handle, check, text);
     copyTranslations.append(item);
   });
 }
@@ -2177,16 +2181,29 @@ function moveCopyTranslation(from, to) {
   renderCopyTranslationOptions(checked);
 }
 
+function formatVerseReference(chapter, verses) {
+  if (!verses.length) return `${chapter}:`;
+  const parts = [];
+  for (let index = 0; index < verses.length; index += 1) {
+    const start = verses[index];
+    let end = start;
+    while (index + 1 < verses.length && verses[index + 1] === end + 1) {
+      index += 1;
+      end = verses[index];
+    }
+    parts.push(start === end ? String(start) : `${start}-${end}`);
+  }
+  return `${chapter}:${parts.join(", ")}`;
+}
+
 function openCopyDialog(panelState) {
-  const bounds = selectionBounds(panelState);
-  if (!bounds || !panelState.data) return;
+  const selectedVerses = selectedVerseNumbers(panelState);
+  if (!selectedVerses.length || !panelState.data) return;
   copyPanelState = panelState;
   copyStatus.textContent = "";
   confirmCopyButton.textContent = "Copy";
   const book = manifest.books[panelState.book];
-  const reference = bounds[0] === bounds[1]
-    ? `${panelState.chapter}:${bounds[0]}`
-    : `${panelState.chapter}:${bounds[0]}-${bounds[1]}`;
+  const reference = formatVerseReference(panelState.chapter, selectedVerses);
   copyReference.textContent = `${book.en} ${book.ko} ${reference}`;
   // Offer only the translations currently shown, in their reading order.
   copyTranslationOrder = [...enabledTranslationIds()];
@@ -2200,15 +2217,14 @@ function closeCopyDialog() {
 }
 
 function buildCopyText(panelState, translations, order) {
-  const [start, end] = selectionBounds(panelState);
+  const selectedVerses = selectedVerseNumbers(panelState);
+  const selected = new Set(selectedVerses);
   const book = manifest.books[panelState.book];
-  const verses = panelState.data.v.filter(([verse]) => verse >= start && verse <= end);
+  const verses = panelState.data.v.filter(([verse]) => selected.has(verse));
   const lines = [];
   const bookNameFor = (translation) =>
     translationLanguage(translation) === "en" ? book.en : book.ko;
-  const range = start === end
-    ? `${panelState.chapter}:${start}`
-    : `${panelState.chapter}:${start}-${end}`;
+  const range = formatVerseReference(panelState.chapter, selectedVerses);
 
   if (order === "translation") {
     for (const translation of translations) {
@@ -2468,7 +2484,6 @@ panelCountTwoButton.addEventListener("click", () => {
   if (desktopLikePanels()) setDesktopPanelMode(2);
   else setTouchPanelCount(2);
 });
-panelFitVisibleButton.addEventListener("click", fitVisiblePanels);
 verseLayoutStackedButton.addEventListener("click", () => setVerseLayout("stacked"));
 verseLayoutColumnsButton.addEventListener("click", () => setVerseLayout("columns"));
 fontSizeDownButton.addEventListener("click", () => changeFontSize(-1));

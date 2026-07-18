@@ -8,7 +8,7 @@
     />
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta name="description" content="A compact multi-panel Bible reader" />
-    <meta name="asset-version" content="20260716-8" />
+    <meta name="asset-version" content="20260718-1" />
     <meta name="theme-color" content="#284f43" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -17,7 +17,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" type="image/png" href="./icons/icon-192.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="./icons/icon-180.png" />
-    <link rel="stylesheet" href="./styles.css?v=20260716-8" />
+    <link rel="stylesheet" href="./styles.css?v=20260718-1" />
   </head>
   <body>
     <header class="app-header"> 
@@ -83,13 +83,6 @@
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <rect x="3" y="4" width="8" height="16" rx="1.5"></rect>
               <rect x="13" y="4" width="8" height="16" rx="1.5"></rect>
-            </svg>
-          </button>
-          <button id="panel-fit-visible" type="button" aria-label="Divide the screen evenly among the visible panels">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <rect x="2.5" y="4" width="5" height="16" rx="1.2"></rect>
-              <rect x="9.5" y="4" width="5" height="16" rx="1.2"></rect>
-              <rect x="16.5" y="4" width="5" height="16" rx="1.2"></rect>
             </svg>
           </button>
         </div>
@@ -204,7 +197,6 @@
             <button class="icon-button remove-panel" type="button" aria-label="Delete panel">×</button>
             <span class="panel-number" aria-label="Panel 1" title="Panel 1">1</span>
             <div class="selector-control book-selector">
-              <span class="selector-label">Book</span>
               <div class="combo book-combo">
                 <input
                   class="combo-input book-input"
@@ -225,13 +217,28 @@
               </svg>
             </button>
             <div class="selector-control chapter-selector">
-              <span class="selector-label">Chapter</span>
               <div class="combo chapter-combo">
                 <input
                   class="combo-input chapter-input"
                   type="text"
                   role="combobox"
                   aria-label="Chapter"
+                  aria-autocomplete="list"
+                  aria-expanded="false"
+                  autocomplete="off"
+                  inputmode="numeric"
+                />
+                <div class="combo-menu" role="listbox"></div>
+              </div>
+            </div>
+            <span class="selector-separator" aria-hidden="true">:</span>
+            <div class="selector-control verse-selector">
+              <div class="combo verse-combo">
+                <input
+                  class="combo-input verse-input"
+                  type="text"
+                  role="combobox"
+                  aria-label="Verse"
                   aria-autocomplete="list"
                   aria-expanded="false"
                   autocomplete="off"
@@ -252,6 +259,18 @@
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <rect x="8" y="8" width="11" height="11" rx="2"></rect>
             <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path>
+          </svg>
+        </button>
+        <button class="selection-mode-button selection-mode-range" type="button" aria-label="Select verse range" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6 7h12M6 12h12M6 17h12"></path>
+          </svg>
+        </button>
+        <button class="selection-mode-button selection-mode-individual" type="button" aria-label="Select individual verses" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="7" cy="7" r="1.4"></circle>
+            <circle cx="17" cy="12" r="1.4"></circle>
+            <circle cx="10" cy="17" r="1.4"></circle>
           </svg>
         </button>
         <button class="cancel-selection" type="button" aria-label="Cancel verse selection" hidden>
@@ -280,6 +299,6 @@
     </div>
 
     <noscript>JavaScript is required to display the Bible text.</noscript>
-    <script type="module" src="./app.js?v=20260716-8"></script>
+    <script type="module" src="./app.js?v=20260718-1"></script>
   </body>
 </html>
