@@ -2191,9 +2191,9 @@ body * {
   }
 
   .combo-option {
-    min-height: 26px;
-    padding: 2px 7px;
-    line-height: 1.12;
+    min-height: 34px;
+    padding: 5px 8px;
+    line-height: 1.2;
   }
 
   .book-combo .combo-menu {
@@ -2202,8 +2202,8 @@ body * {
   }
 
   .combo-option {
-    min-height: 26px;
-    padding: 2px 7px;
+    min-height: 34px;
+    padding: 5px 8px;
   }
 
   .panel-content {
@@ -2831,28 +2831,24 @@ body * {
 
 .selection-bars {
   display: grid;
-  width: 21px;
-  height: 18px;
+  width: 20px;
+  height: 17px;
   align-content: center;
-  gap: 2px;
-  padding: 2px;
-  border: 1px solid #b9b4aa;
-  border-radius: 5px;
-  background: #f7f5f1;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.65);
+  justify-items: center;
+  gap: 1px;
 }
 
 .selection-bars span {
   display: block;
-  width: 15px;
+  width: 18px;
   height: 5px;
   border: 1px solid #817c73;
   border-radius: 2px;
   background: linear-gradient(#918b82, #757068);
 }
 
-.selection-bars-gap span:nth-child(2) {
-  background: #fffefb;
+.selection-bars-gap {
+  gap: 3px;
 }
 
 .selection-mode-button:hover,
@@ -2923,12 +2919,12 @@ body * {
   }
 
   .selection-bars {
-    width: 24px;
-    height: 20px;
+    width: 22px;
+    height: 19px;
   }
 
   .selection-bars span {
-    width: 18px;
+    width: 20px;
     height: 5px;
   }
 }
