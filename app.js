@@ -723,6 +723,7 @@ function setupTouchReorder({ item, handle, container, itemClass, id, getOrder, o
 function setupPressDragPick({ opener, menu, optionSelector, onOpen, onPick, onGestureEnd }) {
   opener.addEventListener("pointerdown", (event) => {
     if (event.pointerType !== "touch") return;
+    event.preventDefault();
     onOpen?.();
     const pointerId = event.pointerId;
     const startX = event.clientX;
@@ -1231,7 +1232,10 @@ function startPanelGlide(velocity) {
 }
 
 function snapTouchPanelsAfterSwipe() {
-  if (!touchPanelToggleLayout.matches || !state?.desktopPanelMode) return false;
+  if (!mobileLayout.matches) return false;
+  if (!phonePortraitLayout.matches && (!touchPanelToggleLayout.matches || !state?.desktopPanelMode)) {
+    return false;
+  }
   cancelPanelGlide();
   const targetIndex = panelIndexAtViewportStart();
   animateTrackScroll(panelScrollLeft(targetIndex), 220);
@@ -2279,6 +2283,8 @@ async function copySelectedVerses() {
     await writeClipboard(text);
     copyStatus.textContent = "Copied";
     confirmCopyButton.textContent = "Copied";
+    const copiedPanelState = copyPanelState;
+    if (copiedPanelState) clearPanelSelection(copiedPanelState);
     window.setTimeout(closeCopyDialog, 450);
   } catch (error) {
     copyStatus.textContent = error.message;
