@@ -1223,6 +1223,8 @@ function setupCombobox({ input, menu, items, selectedValue, matches, onSelect })
 // Momentum for continuous touch panning: the track keeps gliding with the
 // finger's release velocity (px per ms) and decays.
 let panelGlideFrame = 0;
+const TOUCH_PANEL_FLICK_VELOCITY = 0.55;
+const TOUCH_PANEL_FLICK_DISTANCE = 24;
 
 function cancelPanelGlide() {
   cancelAnimationFrame(panelGlideFrame);
@@ -1247,13 +1249,20 @@ function startPanelGlide(velocity) {
   panelGlideFrame = requestAnimationFrame(step);
 }
 
-function snapTouchPanelsAfterSwipe() {
+function snapTouchPanelsAfterSwipe({ velocityX = 0, startIndex = null, totalDeltaX = 0 } = {}) {
   if (!mobileLayout.matches) return false;
   if (!phonePortraitLayout.matches && (!touchPanelToggleLayout.matches || !state?.desktopPanelMode)) {
     return false;
   }
   cancelPanelGlide();
-  const targetIndex = panelIndexAtViewportStart();
+  let targetIndex = panelIndexAtViewportStart();
+  const isFlick = Math.abs(velocityX) >= TOUCH_PANEL_FLICK_VELOCITY
+    && Math.abs(totalDeltaX) >= TOUCH_PANEL_FLICK_DISTANCE;
+  if (isFlick) {
+    const baseIndex = Number.isInteger(startIndex) ? startIndex : targetIndex;
+    const direction = velocityX < 0 ? 1 : -1;
+    targetIndex = Math.max(0, Math.min(baseIndex + direction, state.panels.length - 1));
+  }
   animateTrackScroll(panelScrollLeft(targetIndex), 220);
   return true;
 }
@@ -1294,6 +1303,7 @@ function setupPanelSwipe(panel) {
       startX: touch.clientX,
       startY: touch.clientY,
       startScrollLeft: panelTrack.scrollLeft,
+      startIndex: panelIndexAtViewportStart(),
       axis: null,
       samples: [{ time: performance.now(), x: touch.clientX }],
     };
@@ -1340,10 +1350,17 @@ function setupPanelSwipe(panel) {
       const samples = gesture.samples;
       const first = samples[0];
       const last = samples[samples.length - 1];
-      if (snapTouchPanelsAfterSwipe()) {
+      const velocityX = first && last && last.time > first.time
+        ? (last.x - first.x) / (last.time - first.time)
+        : 0;
+      if (snapTouchPanelsAfterSwipe({
+        velocityX: cancelled ? 0 : velocityX,
+        startIndex: gesture.startIndex,
+        totalDeltaX: touch.clientX - gesture.startX,
+      })) {
         // The one/two-panel touch presets always land on a panel edge.
       } else if (!cancelled && first && last && last.time > first.time) {
-        startPanelGlide(-(last.x - first.x) / (last.time - first.time));
+        startPanelGlide(-velocityX);
       }
 
       suppressClick = true;
