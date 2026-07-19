@@ -1206,10 +1206,38 @@ function setupCombobox({ input, menu, items, selectedValue, matches, onSelect })
     menu.querySelectorAll(".combo-option")[highlighted]?.scrollIntoView({ block: "nearest" });
   }
 
-  function horizontalStep() {
-    if (comboKind === "book" && !input.value.trim()) return 40;
-    if ((comboKind === "chapter" || comboKind === "verse") && !input.value.trim()) return 1;
-    return 0;
+  function moveHighlight(nextIndex) {
+    if (!filtered.length) return false;
+    if (nextIndex < 0 || nextIndex >= filtered.length) return false;
+    updateHighlight(nextIndex);
+    return true;
+  }
+
+  function keyboardTarget(key) {
+    const emptyQuery = !input.value.trim();
+    if (!emptyQuery) {
+      if (key === "ArrowDown") return highlighted + 1;
+      if (key === "ArrowUp") return highlighted - 1;
+      return null;
+    }
+    if (comboKind === "book") {
+      const isNewTestament = highlighted >= 39;
+      const row = isNewTestament ? highlighted - 39 : highlighted;
+      const columnSize = isNewTestament ? 27 : 39;
+      if (key === "ArrowDown") return row + 1 < columnSize ? highlighted + 1 : null;
+      if (key === "ArrowUp") return row > 0 ? highlighted - 1 : null;
+      if (key === "ArrowRight") return !isNewTestament && row < 27 ? 39 + row : null;
+      if (key === "ArrowLeft") return isNewTestament ? row : null;
+    }
+    if (comboKind === "chapter" || comboKind === "verse") {
+      const columns = 5;
+      const column = highlighted % columns;
+      if (key === "ArrowDown") return highlighted + columns;
+      if (key === "ArrowUp") return highlighted - columns;
+      if (key === "ArrowRight") return column < columns - 1 ? highlighted + 1 : null;
+      if (key === "ArrowLeft") return column > 0 ? highlighted - 1 : null;
+    }
+    return null;
   }
 
   function centerHighlighted() {
@@ -1253,16 +1281,17 @@ function setupCombobox({ input, menu, items, selectedValue, matches, onSelect })
   });
   input.addEventListener("keydown", (event) => {
     if (event.isComposing) return;
-    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    if (
+      event.key === "ArrowDown" ||
+      event.key === "ArrowUp" ||
+      event.key === "ArrowLeft" ||
+      event.key === "ArrowRight"
+    ) {
+      const nextIndex = keyboardTarget(event.key);
+      if (nextIndex == null && input.value.trim()) return;
       event.preventDefault();
       if (menu.hidden) open();
-      updateHighlight(highlighted + (event.key === "ArrowDown" ? 1 : -1));
-    } else if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
-      const step = horizontalStep();
-      if (!step) return;
-      event.preventDefault();
-      if (menu.hidden) open();
-      updateHighlight(highlighted + (event.key === "ArrowRight" ? step : -step));
+      if (nextIndex != null) moveHighlight(nextIndex);
     } else if (event.key === "Enter") {
       if (!menu.hidden && filtered.length) {
         event.preventDefault();
