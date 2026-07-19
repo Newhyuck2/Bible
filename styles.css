@@ -956,9 +956,9 @@ mark {
   height: 26px;
   padding: 0 5px;
   place-items: center;
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: 6px;
-  background: white;
+  background: transparent;
   color: #221f1a;
   font-size: 16px;
   font-weight: 900;
@@ -1937,9 +1937,9 @@ body * {
   height: 26px;
   padding: 0 5px;
   place-items: center;
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: 6px;
-  background: white;
+  background: transparent;
   color: #221f1a;
   font-size: 16px;
   font-weight: 900;
@@ -3321,8 +3321,12 @@ html[data-verse-layout="columns"] .translation-label {
 }
 
 .translation-picker-toggle .picker-plus {
+  display: grid;
+  width: 18px;
+  height: 22px;
+  place-items: center;
   color: var(--accent);
-  font-size: 14px;
+  font-size: 22px;
   font-weight: 900;
   line-height: 1;
 }
@@ -3467,6 +3471,16 @@ html[data-verse-layout="columns"] .translation-label {
   line-height: 1;
 }
 
+.translation-chip .chip-remove span {
+  width: 14px;
+  height: 14px;
+}
+
+.translation-chip .chip-remove span::before,
+.translation-chip .chip-remove span::after {
+  width: 13px;
+  height: 1.7px;
+}
 
 .translation-chip .chip-remove:hover {
   background: rgba(162, 79, 98, 0.14);
