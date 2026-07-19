@@ -1604,9 +1604,10 @@ mark {
   color: var(--muted);
   font-size: 10px;
   font-weight: 800;
-  letter-spacing: 0;
+  letter-spacing: 0.07em;
   line-height: 1.1;
   pointer-events: none;
+  text-transform: uppercase;
   user-select: none;
 }
 
@@ -3754,4 +3755,40 @@ html[data-verse-layout="columns"] .translation-label {
     width: calc(100vw - 42px);
     grid-auto-columns: minmax(0, 1fr);
   }
+}
+
+/* Final top-toolbar alignment: every page-level icon/control shares the same
+   32px vertical box so plus buttons, chips, layout controls, and actions line up. */
+.compact-toolbar,
+.compact-toolbar .translation-controls,
+.translation-list,
+.header-actions {
+  align-items: center;
+}
+
+.translation-picker,
+.translation-picker-toggle,
+.translation-chip,
+.verse-layout-control,
+.panel-count-control,
+.font-size-control,
+.header-actions .button {
+  height: 32px;
+}
+
+.translation-picker,
+.translation-list,
+.translation-chip {
+  display: flex;
+  align-items: center;
+}
+
+.translation-picker-toggle,
+.header-actions .button {
+  min-height: 32px;
+}
+
+.translation-chip {
+  min-height: 32px;
+  align-self: center;
 }

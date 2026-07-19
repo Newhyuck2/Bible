@@ -1146,11 +1146,11 @@ function setupCombobox({ input, menu, items, selectedValue, matches, onSelect })
     highlighted = selectedIndex >= 0 ? selectedIndex : 0;
     menu.replaceChildren();
     const emptyQuery = !query.trim();
-    if (emptyQuery && comboKind === "chapter") menu.append(menuHeading("Chapter"));
-    if (emptyQuery && comboKind === "verse") menu.append(menuHeading("Verse"));
+    if (emptyQuery && comboKind === "chapter") menu.append(menuHeading("CHAPTER"));
+    if (emptyQuery && comboKind === "verse") menu.append(menuHeading("VERSE"));
     let addedNewTestamentHeading = false;
     if (emptyQuery && comboKind === "book") {
-      menu.append(menuHeading("Old Testament", "combo-menu-heading-old"));
+      menu.append(menuHeading("OLD TESTAMENT", "combo-menu-heading-old"));
     }
     for (const [index, item] of filtered.entries()) {
       if (
@@ -1159,7 +1159,7 @@ function setupCombobox({ input, menu, items, selectedValue, matches, onSelect })
         !addedNewTestamentHeading &&
         item.testament === "new"
       ) {
-        menu.append(menuHeading("New Testament", "combo-menu-heading-new"));
+        menu.append(menuHeading("NEW TESTAMENT", "combo-menu-heading-new"));
         addedNewTestamentHeading = true;
       }
       const option = document.createElement("button");
