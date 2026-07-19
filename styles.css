@@ -737,11 +737,22 @@ input:focus {
   height: 36px;
   min-height: 36px;
   padding: 0;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: #b9b0a1;
 }
 
 .search-result-action svg {
   width: 17px;
   height: 17px;
+}
+
+.search-result-action:hover {
+  border-color: transparent;
+  background: #f7f4ee;
+  color: #9c9589;
+  transform: none;
 }
 
 .search-reference {
