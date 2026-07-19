@@ -45,6 +45,11 @@ const searchInput = document.querySelector("#search-input");
 const searchMeta = document.querySelector("#search-meta");
 const searchBookList = document.querySelector("#search-book-list");
 const searchResults = document.querySelector("#search-results");
+const searchActionDialog = document.querySelector("#search-action-dialog");
+const searchActionReference = document.querySelector("#search-action-reference");
+const searchActionViewButton = document.querySelector("#search-action-view");
+const searchActionCopyButton = document.querySelector("#search-action-copy");
+const searchActionCancelButton = document.querySelector("#search-action-cancel");
 const fontSizeDownButton = document.querySelector("#font-size-down");
 const fontSizeUpButton = document.querySelector("#font-size-up");
 const fontSizeValue = document.querySelector("#font-size-value");
@@ -72,6 +77,7 @@ let state;
 let activePanelId;
 let panelIdCounter = 0;
 let searchRequestId = 0;
+let pendingSearchResult = null;
 let copyPanelState = null;
 let copyTranslationOrder = [];
 let panelMutationInProgress = false;
@@ -1951,7 +1957,7 @@ function scrollVerseToTop(panelState, verse, behavior = "smooth") {
 
 async function loadPanel(panelState, targetVerse = null) {
   const elements = panelElements.get(panelState.id);
-  if (!elements) return;
+  if (!elements) return false;
   const requestKey = `${panelState.book}:${panelState.chapter}:${Date.now()}`;
   elements.panel.dataset.requestKey = requestKey;
   clearPanelSelection(panelState);
@@ -1960,7 +1966,7 @@ async function loadPanel(panelState, targetVerse = null) {
 
   try {
     const data = await getChapter(panelState.book, panelState.chapter);
-    if (elements.panel.dataset.requestKey !== requestKey) return;
+    if (elements.panel.dataset.requestKey !== requestKey) return false;
     panelState.data = data;
     panelState.verse = targetVerse || 1;
     renderPanelBody(panelState);
@@ -1969,8 +1975,10 @@ async function loadPanel(panelState, targetVerse = null) {
     } else {
       elements.content.scrollTop = 0;
     }
+    return true;
   } catch (error) {
     elements.content.innerHTML = `<div class="panel-message error">${escapeHtml(error.message)}<br />Use a local HTTP server when previewing.</div>`;
+    return false;
   }
 }
 
@@ -2330,6 +2338,7 @@ function openSearch() {
 }
 
 function closeSearch() {
+  closeSearchResultActions();
   searchDialog.close();
 }
 
@@ -2424,10 +2433,7 @@ function renderSearchResults(query, matches, bookCounts, totalTranslationMatches
     } else {
       referenceText.textContent = `${book.en} ${book.ko} ${result.chapter}:${result.verse}`;
     }
-    const arrow = document.createElement("span");
-    arrow.setAttribute("aria-hidden", "true");
-    arrow.textContent = "→";
-    reference.append(referenceText, arrow);
+    reference.append(referenceText);
     button.append(reference);
 
     const translationOrder = enabledTranslationIds();
@@ -2447,7 +2453,7 @@ function renderSearchResults(query, matches, bookCounts, totalTranslationMatches
       row.append(label, text);
       button.append(row);
     }
-    button.addEventListener("click", () => openSearchResult(result));
+    button.addEventListener("click", () => openSearchResultActions(result));
     searchResults.append(button);
   }
 }
@@ -2470,7 +2476,31 @@ function appendHighlighted(element, text, query) {
   }
 }
 
+function searchResultReferenceText(result) {
+  const book = manifest.books[result.book];
+  const resultLanguages = new Set((result.lines ?? []).map((line) => translationLanguage(line.translation)));
+  if (resultLanguages.size === 1 && resultLanguages.has("ko")) {
+    return `${book.ko} ${result.chapter}:${result.verse}`;
+  }
+  if (resultLanguages.size === 1 && resultLanguages.has("en")) {
+    return `${book.en} ${result.chapter}:${result.verse}`;
+  }
+  return `${book.en} ${book.ko} ${result.chapter}:${result.verse}`;
+}
+
+function openSearchResultActions(result) {
+  pendingSearchResult = result;
+  searchActionReference.textContent = searchResultReferenceText(result);
+  searchActionDialog.showModal();
+}
+
+function closeSearchResultActions() {
+  if (searchActionDialog.open) searchActionDialog.close();
+  pendingSearchResult = null;
+}
+
 function openSearchResult(result) {
+  closeSearchResultActions();
   const panelState = state.panels.find((panel) => panel.id === activePanelId) ?? state.panels[0];
   panelState.book = result.book;
   panelState.chapter = result.chapter;
@@ -2479,6 +2509,25 @@ function openSearchResult(result) {
   const elements = panelElements.get(panelState.id);
   elements.panel.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
   loadPanel(panelState, result.verse);
+}
+
+async function copySearchResult(result) {
+  closeSearchResultActions();
+  const panelState = state.panels.find((panel) => panel.id === activePanelId) ?? state.panels[0];
+  panelState.book = result.book;
+  panelState.chapter = result.chapter;
+  saveState();
+  closeSearch();
+  const elements = panelElements.get(panelState.id);
+  elements.panel.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+  const loaded = await loadPanel(panelState, result.verse);
+  if (!loaded) return;
+  panelState.selectionMode = state.copySelectionMode;
+  panelState.selectionAnchor = result.verse;
+  panelState.selectionEnd = result.verse;
+  panelState.selectedVerses = new Set([result.verse]);
+  updatePanelSelection(panelState);
+  openCopyDialog(panelState);
 }
 
 function escapeHtml(value) {
@@ -2531,6 +2580,16 @@ openSearchButton.addEventListener("click", openSearch);
 closeSearchButton.addEventListener("click", closeSearch);
 searchDialog.addEventListener("click", (event) => {
   if (event.target === searchDialog) closeSearch();
+});
+searchActionViewButton.addEventListener("click", () => {
+  if (pendingSearchResult) openSearchResult(pendingSearchResult);
+});
+searchActionCopyButton.addEventListener("click", () => {
+  if (pendingSearchResult) copySearchResult(pendingSearchResult);
+});
+searchActionCancelButton.addEventListener("click", closeSearchResultActions);
+searchActionDialog.addEventListener("click", (event) => {
+  if (event.target === searchActionDialog) closeSearchResultActions();
 });
 closeCopyButton.addEventListener("click", closeCopyDialog);
 cancelCopyButton.addEventListener("click", closeCopyDialog);

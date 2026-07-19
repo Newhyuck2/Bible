@@ -333,6 +333,7 @@ p {
   background: transparent;
   color: var(--muted);
   font-size: 22px;
+  line-height: 1;
 }
 
 .icon-button:hover {
@@ -548,6 +549,37 @@ input:focus {
   backdrop-filter: blur(5px);
 }
 
+.search-action-dialog {
+  width: min(340px, calc(100vw - 40px));
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 22px 60px rgba(31, 27, 21, 0.28);
+}
+
+.search-action-dialog::backdrop {
+  background: rgba(29, 27, 23, 0.28);
+}
+
+.search-action-shell {
+  padding: 18px;
+}
+
+.search-action-shell p {
+  margin: 0 0 14px;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.search-action-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
 .search-shell {
   display: grid;
   height: 100%;
@@ -663,7 +695,6 @@ input:focus {
 .search-reference {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   margin-bottom: 8px;
   color: var(--accent);
   font-size: 13px;
@@ -2802,7 +2833,7 @@ body * {
   height: 34px;
   padding: 0;
   place-items: center;
-  transform: translateX(-50%);
+  transform: none;
   border: 1px solid var(--line-strong);
   border-radius: 8px;
   background: white;
@@ -2811,19 +2842,22 @@ body * {
 }
 
 .selection-mode-range {
-  left: calc(50% - 63px);
+  left: 10px;
 }
 
 .selection-mode-individual {
-  left: calc(50% - 21px);
+  left: 52px;
 }
 
 .copy-selection {
-  left: calc(50% + 21px);
+  right: 52px;
+  left: auto;
+  transform: none;
 }
 
 .cancel-selection {
-  left: calc(50% + 63px);
+  right: 10px;
+  left: auto;
 }
 
 .selection-mode-button svg,
@@ -2898,6 +2932,7 @@ body * {
   }
 
   .selection-mode-button,
+  .copy-selection,
   .cancel-selection {
     bottom: 12px;
     width: 44px;
@@ -2905,19 +2940,21 @@ body * {
   }
 
   .selection-mode-range {
-    left: calc(50% - 78px);
+    left: 12px;
   }
 
   .selection-mode-individual {
-    left: calc(50% - 26px);
+    left: 64px;
   }
 
   .copy-selection {
-    left: calc(50% + 26px);
+    right: 64px;
+    left: auto;
   }
 
   .cancel-selection {
-    left: calc(50% + 78px);
+    right: 12px;
+    left: auto;
   }
 
   .selection-mode-button svg,
