@@ -94,7 +94,7 @@ function freshState() {
     desktopPanelMode: null,
     verseLayout: "stacked",
     copySelectionMode: "range",
-    panels: [{ book: 0, chapter: 1 }],
+    panels: [{ book: 0, chapter: 1, verse: 1, history: [{ book: 0, chapter: 1, verse: 1 }], historyIndex: 0 }],
   };
 }
 
@@ -136,11 +136,32 @@ function sanitizeState() {
     .map((panel) => {
       const book = Math.max(0, Math.min(Number(panel.book) || 0, manifest.books.length - 1));
       const chapter = Math.max(1, Math.min(Number(panel.chapter) || 1, manifest.books[book].chapters));
+      const verse = Math.max(1, Number(panel.verse) || 1);
       const width = panel.width == null ? Number.NaN : Number(panel.width);
-      return { book, chapter, width: Number.isFinite(width) ? Math.max(1, Math.min(width, 5000)) : null };
+      const history = Array.isArray(panel.history)
+        ? panel.history
+            .map((item) => ({
+              book: Math.max(0, Math.min(Number(item.book) || 0, manifest.books.length - 1)),
+              chapter: Math.max(1, Math.min(Number(item.chapter) || 1, manifest.books[
+                Math.max(0, Math.min(Number(item.book) || 0, manifest.books.length - 1))
+              ].chapters)),
+              verse: Math.max(1, Number(item.verse) || 1),
+            }))
+            .slice(-100)
+        : [];
+      if (!history.length) history.push({ book, chapter, verse });
+      const historyIndex = Math.max(0, Math.min(Number(panel.historyIndex) || 0, history.length - 1));
+      return {
+        book,
+        chapter,
+        verse,
+        history,
+        historyIndex,
+        width: Number.isFinite(width) ? Math.max(1, Math.min(width, 5000)) : null,
+      };
     })
     .slice(0, 12);
-  if (!state.panels.length) state.panels = [{ book: 0, chapter: 1 }];
+  if (!state.panels.length) state.panels = freshState().panels;
 }
 
 function saveState() {
@@ -153,7 +174,14 @@ function saveState() {
       desktopPanelMode: state.desktopPanelMode,
       verseLayout: state.verseLayout,
       copySelectionMode: state.copySelectionMode,
-      panels: state.panels.map(({ book, chapter, width }) => ({ book, chapter, width })),
+      panels: state.panels.map(({ book, chapter, verse, history, historyIndex, width }) => ({
+        book,
+        chapter,
+        verse,
+        history,
+        historyIndex,
+        width,
+      })),
     }),
   );
 }
@@ -1217,6 +1245,8 @@ function setupCombobox({ input, menu, items, selectedValue, matches, onSelect })
   close();
 
   return {
+    open,
+    close,
     setItems(nextItems) {
       allItems = nextItems;
       render();
@@ -1396,6 +1426,52 @@ function verseItems(panelState) {
   return verses.map((verse) => ({ value: verse, label: String(verse) }));
 }
 
+function verseItemsFromChapterData(data) {
+  const verses = data?.v?.map(([verse]) => Number(verse)).filter(Number.isFinite) ?? [1];
+  return verses.map((verse) => ({ value: verse, label: String(verse) }));
+}
+
+function normalizePassage(book, chapter, verse = 1) {
+  const normalizedBook = Math.max(0, Math.min(Number(book) || 0, manifest.books.length - 1));
+  const normalizedChapter = Math.max(
+    1,
+    Math.min(Number(chapter) || 1, manifest.books[normalizedBook].chapters),
+  );
+  return {
+    book: normalizedBook,
+    chapter: normalizedChapter,
+    verse: Math.max(1, Number(verse) || 1),
+  };
+}
+
+function samePassage(a, b) {
+  return Boolean(a && b && a.book === b.book && a.chapter === b.chapter && a.verse === b.verse);
+}
+
+function currentPassage(panelState) {
+  return normalizePassage(panelState.book, panelState.chapter, panelState.verse);
+}
+
+function ensurePanelHistory(panelState) {
+  if (!Array.isArray(panelState.history) || !panelState.history.length) {
+    panelState.history = [currentPassage(panelState)];
+    panelState.historyIndex = 0;
+  }
+  panelState.historyIndex = Math.max(
+    0,
+    Math.min(Number(panelState.historyIndex) || 0, panelState.history.length - 1),
+  );
+}
+
+function recordPanelHistory(panelState, passage = currentPassage(panelState)) {
+  ensurePanelHistory(panelState);
+  if (samePassage(panelState.history[panelState.historyIndex], passage)) return;
+  panelState.history = panelState.history.slice(0, panelState.historyIndex + 1);
+  panelState.history.push(passage);
+  if (panelState.history.length > 100) panelState.history.shift();
+  panelState.historyIndex = panelState.history.length - 1;
+}
+
 function maximumPanelWidth() {
   return Math.max(320, panelAvailableWidth());
 }
@@ -1469,7 +1545,8 @@ function createPanelElement(panelState, shouldScroll = false) {
   const selectionModeIndividual = fragment.querySelector(".selection-mode-individual");
   const cancelSelection = fragment.querySelector(".cancel-selection");
   const remove = fragment.querySelector(".remove-panel");
-  const panelNumber = fragment.querySelector(".panel-number");
+  const historyBack = fragment.querySelector(".panel-history-back");
+  const historyForward = fragment.querySelector(".panel-history-forward");
   const moveLeft = fragment.querySelector(".panel-move-left");
   const moveRight = fragment.querySelector(".panel-move-right");
   const previous = fragment.querySelector(".previous-chapter");
@@ -1482,6 +1559,7 @@ function createPanelElement(panelState, shouldScroll = false) {
   panelState.selectedVerses = new Set();
   panelState.selectionMode = state.copySelectionMode;
   panelState.verse = Number(panelState.verse) || 1;
+  ensurePanelHistory(panelState);
   if (panelState.width) {
     const renderedWidth = desktopLikePanels()
       ? Math.min(panelState.width, maximumPanelWidth())
@@ -1499,6 +1577,28 @@ function createPanelElement(panelState, shouldScroll = false) {
   }));
   let chapterCombo;
   let verseCombo;
+  const openComboSoon = (combo) => {
+    requestAnimationFrame(() => combo.open(true));
+  };
+  const ensureDraft = () => {
+    if (!panelState.pendingPassage) panelState.pendingPassage = currentPassage(panelState);
+    return panelState.pendingPassage;
+  };
+  const openVerseOptionsForDraft = async () => {
+    const draft = ensureDraft();
+    try {
+      const data = await getChapter(draft.book, draft.chapter);
+      const items = verseItemsFromChapterData(data);
+      draft.verse = Math.max(1, Math.min(Number(draft.verse) || 1, items.at(-1)?.value ?? 1));
+      verseCombo.setItems(items);
+      verseCombo.setValue(draft.verse);
+      openComboSoon(verseCombo);
+    } catch {
+      verseCombo.setItems([{ value: 1, label: "1" }]);
+      verseCombo.setValue(1);
+      openComboSoon(verseCombo);
+    }
+  };
   const bookCombo = setupCombobox({
     input: bookInput,
     menu: fragment.querySelector(".book-combo .combo-menu"),
@@ -1506,15 +1606,15 @@ function createPanelElement(panelState, shouldScroll = false) {
     selectedValue: panelState.book,
     matches: matchesBook,
     onSelect: (book) => {
-      panelState.book = book;
-      panelState.chapter = 1;
-      panelState.verse = 1;
+      const draft = ensureDraft();
+      draft.book = book;
+      draft.chapter = 1;
+      draft.verse = 1;
       chapterCombo.setItems(chapterItems(book));
       chapterCombo.setValue(1);
       verseCombo.setItems([{ value: 1, label: "1" }]);
       verseCombo.setValue(1);
-      saveState();
-      loadPanel(panelState);
+      openComboSoon(chapterCombo);
     },
   });
   chapterCombo = setupCombobox({
@@ -1524,12 +1624,12 @@ function createPanelElement(panelState, shouldScroll = false) {
     selectedValue: panelState.chapter,
     matches: (item, query) => !query.trim() || item.label.startsWith(query.trim()),
     onSelect: (chapter) => {
-      panelState.chapter = chapter;
-      panelState.verse = 1;
+      const draft = ensureDraft();
+      draft.chapter = chapter;
+      draft.verse = 1;
       verseCombo.setItems([{ value: 1, label: "1" }]);
       verseCombo.setValue(1);
-      saveState();
-      loadPanel(panelState);
+      openVerseOptionsForDraft();
     },
   });
   verseCombo = setupCombobox({
@@ -1539,9 +1639,9 @@ function createPanelElement(panelState, shouldScroll = false) {
     selectedValue: panelState.verse,
     matches: (item, query) => !query.trim() || item.label.startsWith(query.trim()),
     onSelect: (verse) => {
-      panelState.verse = verse;
-      updatePanelControls(panelState);
-      scrollVerseToTop(panelState, verse);
+      const draft = panelState.pendingPassage ?? currentPassage(panelState);
+      panelState.pendingPassage = null;
+      goToPassage(panelState, { ...draft, verse }, { record: true });
     },
   });
   copy.addEventListener("click", () => openCopyDialog(panelState));
@@ -1549,6 +1649,8 @@ function createPanelElement(panelState, shouldScroll = false) {
   selectionModeIndividual.addEventListener("click", () => setPanelSelectionMode(panelState, "individual"));
   cancelSelection.addEventListener("click", () => clearPanelSelection(panelState));
   remove.addEventListener("click", () => removePanel(id));
+  historyBack.addEventListener("click", () => navigatePanelHistory(panelState, -1));
+  historyForward.addEventListener("click", () => navigatePanelHistory(panelState, 1));
   moveLeft.addEventListener("click", (event) => {
     event.stopPropagation();
     movePanelBy(panelState, -1);
@@ -1575,7 +1677,8 @@ function createPanelElement(panelState, shouldScroll = false) {
     selectionModeIndividual,
     cancelSelection,
     remove,
-    panelNumber,
+    historyBack,
+    historyForward,
     moveLeft,
     moveRight,
     previous,
@@ -1773,14 +1876,6 @@ function movePanelBy(panelState, direction) {
 }
 
 function updatePanelNumbers() {
-  state.panels.forEach((panelState, index) => {
-    const panelNumber = panelElements.get(panelState.id)?.panelNumber;
-    if (!panelNumber) return;
-    const number = index + 1;
-    panelNumber.textContent = number;
-    panelNumber.setAttribute("aria-label", `Panel ${number}`);
-    panelNumber.title = `Panel ${number}`;
-  });
 }
 
 function updatePanelMoveButtons() {
@@ -1984,6 +2079,35 @@ async function loadPanel(panelState, targetVerse = null) {
   }
 }
 
+async function goToPassage(panelState, passage, { record = true } = {}) {
+  const target = normalizePassage(passage.book, passage.chapter, passage.verse);
+  const chapterChanged = panelState.book !== target.book || panelState.chapter !== target.chapter || !panelState.data;
+  panelState.book = target.book;
+  panelState.chapter = target.chapter;
+  panelState.verse = target.verse;
+  saveState();
+  let loaded = true;
+  if (chapterChanged) {
+    loaded = await loadPanel(panelState, target.verse);
+  } else {
+    updatePanelControls(panelState);
+    scrollVerseToTop(panelState, target.verse);
+  }
+  if (!loaded) return false;
+  if (record) recordPanelHistory(panelState, target);
+  updatePanelControls(panelState);
+  saveState();
+  return true;
+}
+
+function navigatePanelHistory(panelState, direction) {
+  ensurePanelHistory(panelState);
+  const nextIndex = panelState.historyIndex + direction;
+  if (nextIndex < 0 || nextIndex >= panelState.history.length) return;
+  panelState.historyIndex = nextIndex;
+  goToPassage(panelState, panelState.history[nextIndex], { record: false });
+}
+
 // Re-rendering replaces the verse nodes while scrollTop stays put, so when
 // row heights change (enabling another translation, switching layouts) the
 // reader loses their place. Anchor on a visible selected verse when there is
@@ -2104,6 +2228,9 @@ function updatePanelControls(panelState) {
   panelState.verse = Math.max(1, Math.min(Number(panelState.verse) || 1, maxVerse));
   elements.verseCombo.setItems(verses);
   elements.verseCombo.setValue(panelState.verse);
+  ensurePanelHistory(panelState);
+  elements.historyBack.disabled = panelState.historyIndex <= 0;
+  elements.historyForward.disabled = panelState.historyIndex >= panelState.history.length - 1;
   elements.previous.disabled = panelState.book === 0 && panelState.chapter === 1;
   const finalBook = manifest.books.length - 1;
   elements.next.disabled =
@@ -2121,10 +2248,7 @@ function navigateChapter(panelState, direction) {
     chapter = 1;
   }
   if (book === panelState.book && chapter === panelState.chapter) return;
-  panelState.book = book;
-  panelState.chapter = chapter;
-  saveState();
-  loadPanel(panelState);
+  goToPassage(panelState, { book, chapter, verse: 1 }, { record: true });
 }
 
 function applyFontSize() {
@@ -2502,24 +2626,22 @@ function closeSearchResultActions() {
 function openSearchResult(result) {
   closeSearchResultActions();
   const panelState = state.panels.find((panel) => panel.id === activePanelId) ?? state.panels[0];
-  panelState.book = result.book;
-  panelState.chapter = result.chapter;
-  saveState();
   closeSearch();
   const elements = panelElements.get(panelState.id);
   elements.panel.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
-  loadPanel(panelState, result.verse);
+  goToPassage(panelState, { book: result.book, chapter: result.chapter, verse: result.verse }, { record: true });
 }
 
 async function copySearchResult(result) {
   closeSearchResultActions();
   const panelState = state.panels.find((panel) => panel.id === activePanelId) ?? state.panels[0];
-  panelState.book = result.book;
-  panelState.chapter = result.chapter;
-  saveState();
   const elements = panelElements.get(panelState.id);
   elements.panel.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
-  const loaded = await loadPanel(panelState, result.verse);
+  const loaded = await goToPassage(
+    panelState,
+    { book: result.book, chapter: result.chapter, verse: result.verse },
+    { record: true },
+  );
   if (!loaded) return;
   panelState.selectionMode = state.copySelectionMode;
   panelState.selectionAnchor = result.verse;

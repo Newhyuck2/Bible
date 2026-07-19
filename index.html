@@ -8,7 +8,7 @@
     />
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta name="description" content="A compact multi-panel Bible reader" />
-    <meta name="asset-version" content="20260719-6" />
+    <meta name="asset-version" content="20260719-7" />
     <meta name="theme-color" content="#284f43" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -17,7 +17,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" type="image/png" href="./icons/icon-192.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="./icons/icon-180.png" />
-    <link rel="stylesheet" href="./styles.css?v=20260719-6" />
+    <link rel="stylesheet" href="./styles.css?v=20260719-7" />
   </head>
   <body>
     <header class="app-header">
@@ -233,8 +233,16 @@
       <article class="bible-panel">
         <header class="panel-header">
           <div class="panel-selectors">
-            <button class="icon-button close-button remove-panel" type="button" aria-label="Delete panel"><span aria-hidden="true"></span></button>
-            <span class="panel-number" aria-label="Panel 1" title="Panel 1">1</span>
+            <button class="panel-history panel-history-back" type="button" aria-label="Previous passage in history">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M14 5 8 12l6 7"></path>
+              </svg>
+            </button>
+            <button class="panel-history panel-history-forward" type="button" aria-label="Next passage in history">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="m10 5 6 7-6 7"></path>
+              </svg>
+            </button>
             <div class="selector-control book-selector">
               <div class="combo book-combo">
                 <input
@@ -250,11 +258,6 @@
                 <div class="combo-menu" role="listbox"></div>
               </div>
             </div>
-            <button class="chapter-nav previous-chapter" type="button" aria-label="Previous chapter">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M14 5 10 12l4 7"></path>
-              </svg>
-            </button>
             <div class="selector-control chapter-selector">
               <div class="combo chapter-combo">
                 <input
@@ -286,14 +289,20 @@
                 <div class="combo-menu" role="listbox"></div>
               </div>
             </div>
-            <button class="chapter-nav next-chapter" type="button" aria-label="Next chapter">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="m10 5 4 7-4 7"></path>
-              </svg>
-            </button>
+            <button class="icon-button close-button remove-panel" type="button" aria-label="Delete panel"><span aria-hidden="true"></span></button>
           </div>
         </header>
         <div class="panel-content" tabindex="0"></div>
+        <button class="chapter-jump chapter-jump-previous previous-chapter" type="button" aria-label="Previous chapter">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M15 5 8 12l7 7"></path>
+          </svg>
+        </button>
+        <button class="chapter-jump chapter-jump-next next-chapter" type="button" aria-label="Next chapter">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="m9 5 7 7-7 7"></path>
+          </svg>
+        </button>
         <button class="copy-selection" type="button" aria-label="Copy selected verses" hidden>
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <rect x="8" y="8" width="11" height="11" rx="2"></rect>
@@ -340,6 +349,6 @@
     </div>
 
     <noscript>JavaScript is required to display the Bible text.</noscript>
-    <script type="module" src="./app.js?v=20260719-6"></script>
+    <script type="module" src="./app.js?v=20260719-7"></script>
   </body>
 </html>
