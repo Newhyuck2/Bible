@@ -633,9 +633,25 @@ input:focus {
 }
 
 .search-action-buttons {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  justify-content: center;
   gap: 8px;
+}
+
+.search-form .icon-only-button {
+  width: 48px;
+  min-width: 48px;
+  height: 48px;
+  min-height: 48px;
+  padding: 0;
+}
+
+.search-action-buttons .icon-only-button {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
 }
 
 .search-shell {
@@ -1400,17 +1416,28 @@ mark {
 
 .copy-actions {
   display: flex;
+  position: relative;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: center;
   gap: 8px;
   margin-top: 16px;
 }
 
 .copy-status {
-  margin-right: auto;
+  position: absolute;
+  left: 0;
+  margin-right: 0;
   color: var(--accent);
   font-size: 11px;
   font-weight: 800;
+}
+
+#confirm-copy {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
 }
 
 @media (max-width: 760px) {
@@ -2441,8 +2468,11 @@ body * {
   }
 
   .search-form .button {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
     min-height: 44px;
-    padding-inline: 12px;
+    padding: 0;
   }
 
   .search-meta {
@@ -2547,6 +2577,9 @@ body * {
   }
 
   .copy-actions .button {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
     min-height: 44px;
   }
 }
