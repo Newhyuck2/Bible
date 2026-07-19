@@ -1117,6 +1117,28 @@ function setupCombobox({ input, menu, items, selectedValue, matches, onSelect })
     input.setAttribute("aria-expanded", "false");
   }
 
+  function resetMenuPosition() {
+    menu.style.removeProperty("left");
+    menu.style.removeProperty("right");
+    menu.style.removeProperty("width");
+  }
+
+  function positionMenu() {
+    if (comboKind !== "book" || !mobileLayout.matches) {
+      resetMenuPosition();
+      return;
+    }
+    const combo = input.closest(".combo");
+    const boundary = input.closest(".panel-selectors");
+    if (!combo || !boundary) return;
+    const comboRect = combo.getBoundingClientRect();
+    const boundaryRect = boundary.getBoundingClientRect();
+    if (!comboRect.width || !boundaryRect.width) return;
+    menu.style.left = `${Math.round(boundaryRect.left - comboRect.left)}px`;
+    menu.style.right = "auto";
+    menu.style.width = `${Math.floor(boundaryRect.width)}px`;
+  }
+
   function choose(item, notify = true) {
     if (!item) return;
     selected = item.value;
@@ -1198,6 +1220,7 @@ function setupCombobox({ input, menu, items, selectedValue, matches, onSelect })
     render(clearText ? "" : input.value === selectedItem()?.label ? "" : input.value);
     menu.hidden = false;
     input.setAttribute("aria-expanded", "true");
+    positionMenu();
     if (focusInput) input.focus({ preventScroll: true });
     centerHighlighted();
   }
@@ -1220,6 +1243,7 @@ function setupCombobox({ input, menu, items, selectedValue, matches, onSelect })
     render(input.value);
     menu.hidden = false;
     input.setAttribute("aria-expanded", "true");
+    positionMenu();
   });
   input.addEventListener("keydown", (event) => {
     if (event.isComposing) return;
