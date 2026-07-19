@@ -125,7 +125,7 @@ function sanitizeState() {
   const savedDesktopMode = Number(state.desktopPanelMode);
   state.desktopPanelMode = savedDesktopMode === 1 || savedDesktopMode === 2
     ? savedDesktopMode
-    : touchPanelToggleLayout.matches ? 2 : null;
+    : desktopLikePanels() ? 2 : null;
   state.panels = state.panels
     .map((panel) => {
       const book = Math.max(0, Math.min(Number(panel.book) || 0, manifest.books.length - 1));
