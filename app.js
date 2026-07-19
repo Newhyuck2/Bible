@@ -1178,6 +1178,7 @@ function setupCombobox({ input, menu, items, selectedValue, matches, onSelect })
       empty.textContent = "No matches";
       menu.append(empty);
     }
+    if (query.trim()) menu.scrollTop = 0;
   }
 
   function updateHighlight(nextIndex) {
@@ -1602,7 +1603,7 @@ function createPanelElement(panelState, shouldScroll = false) {
 
   const bookItems = manifest.books.map((book, index) => ({
     value: index,
-    label: `${book.en}, ${book.ko}`,
+    label: `${book.en} ${book.ko}`,
     ko: book.ko,
     en: book.en,
     testament: index < 39 ? "old" : "new",

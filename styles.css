@@ -3754,22 +3754,24 @@ html[data-verse-layout="columns"] .translation-label {
     right: auto;
     width: calc(100vw - 24px);
     padding: 4px;
-    grid-auto-columns: minmax(0, 1fr);
+    grid-template-columns: minmax(112px, 0.78fr) minmax(176px, 1.22fr);
+    grid-auto-columns: auto;
+    column-gap: 0;
   }
 
   .book-combo .combo-option {
     min-height: 30px;
-    padding: 4px 2px;
+    padding: 4px 1px;
     overflow: visible;
-    font-size: 9.5px;
-    line-height: 1;
+    font-size: 12px;
+    line-height: 1.1;
     white-space: nowrap;
   }
 
   .book-combo .combo-menu-heading {
     min-height: 30px;
-    padding: 2px;
-    font-size: 8.5px;
+    padding: 2px 1px;
+    font-size: 10px;
     white-space: nowrap;
   }
 }
