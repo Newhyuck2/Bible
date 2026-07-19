@@ -3618,7 +3618,7 @@ html[data-verse-layout="columns"] .translation-label {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: white;
-  color: var(--accent);
+  color: var(--muted);
   box-shadow: none;
 }
 
