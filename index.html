@@ -8,7 +8,7 @@
     />
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta name="description" content="A compact multi-panel Bible reader" />
-    <meta name="asset-version" content="20260720-12" />
+    <meta name="asset-version" content="20260720-13" />
     <meta name="theme-color" content="#284f43" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -17,7 +17,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" type="image/png" href="./icons/icon-192.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="./icons/icon-180.png" />
-    <link rel="stylesheet" href="./styles.css?v=20260720-12" />
+    <link rel="stylesheet" href="./styles.css?v=20260720-13" />
   </head>
   <body>
     <header class="app-header">
@@ -288,20 +288,22 @@
             <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path>
           </svg>
         </button>
-        <button class="selection-mode-button selection-mode-range" type="button" aria-label="Select verse range" hidden>
-          <span class="selection-bars" aria-hidden="true">
-            <span></span>
-            <span></span>
-            <span></span>
-          </span>
-        </button>
-        <button class="selection-mode-button selection-mode-individual" type="button" aria-label="Select individual verses" hidden>
-          <span class="selection-bars selection-bars-gap" aria-hidden="true">
-            <span></span>
-            <span></span>
-            <span></span>
-          </span>
-        </button>
+        <div class="selection-mode-control" role="group" aria-label="Verse selection mode" hidden>
+          <button class="selection-mode-button selection-mode-range" type="button" aria-label="Select verse range">
+            <span class="selection-bars" aria-hidden="true">
+              <span></span>
+              <span></span>
+              <span></span>
+            </span>
+          </button>
+          <button class="selection-mode-button selection-mode-individual" type="button" aria-label="Select individual verses">
+            <span class="selection-bars selection-bars-gap" aria-hidden="true">
+              <span></span>
+              <span></span>
+              <span></span>
+            </span>
+          </button>
+        </div>
         <button class="cancel-selection" type="button" aria-label="Cancel verse selection" hidden>
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M6 6l12 12M18 6 6 18"></path>
@@ -328,6 +330,6 @@
     </div>
 
     <noscript>JavaScript is required to display the Bible text.</noscript>
-    <script type="module" src="./app.js?v=20260720-12"></script>
+    <script type="module" src="./app.js?v=20260720-13"></script>
   </body>
 </html>

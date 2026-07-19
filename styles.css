@@ -2978,6 +2978,7 @@ body * {
   padding-bottom: 68px;
 }
 
+.selection-mode-control,
 .selection-mode-button,
 .cancel-selection {
   position: absolute;
@@ -2996,12 +2997,23 @@ body * {
   box-shadow: 0 5px 14px rgba(37, 35, 31, 0.14);
 }
 
-.selection-mode-range {
+.selection-mode-control {
   left: 10px;
+  display: flex;
+  width: auto;
+  height: 34px;
+  gap: 0;
+  padding: 2px;
 }
 
-.selection-mode-individual {
-  left: 52px;
+.selection-mode-button {
+  position: relative;
+  bottom: auto;
+  width: 32px;
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  box-shadow: none;
 }
 
 .copy-selection {
@@ -3062,7 +3074,7 @@ body * {
 
 .selection-mode-button.selected,
 .selection-mode-button.selected:hover {
-  border-color: #9abdad;
+  border-color: transparent;
   background: var(--accent-soft);
   color: var(--accent);
 }
@@ -3092,20 +3104,28 @@ body * {
     display: none !important;
   }
 
+  .selection-mode-control,
   .selection-mode-button,
   .copy-selection,
   .cancel-selection {
     bottom: 12px;
-    width: 44px;
     height: 44px;
   }
 
-  .selection-mode-range {
-    left: 12px;
+  .copy-selection,
+  .cancel-selection {
+    width: 44px;
   }
 
-  .selection-mode-individual {
-    left: 64px;
+  .selection-mode-control {
+    left: 12px;
+    width: auto;
+    padding: 2px;
+  }
+
+  .selection-mode-button {
+    width: 40px;
+    height: 38px;
   }
 
   .copy-selection {
@@ -3733,18 +3753,19 @@ html[data-verse-layout="columns"] .translation-label {
   stroke-width: 2;
 }
 
+.selection-mode-control,
 .selection-mode-button,
 .cancel-selection,
 .copy-selection {
   transform: translateX(-50%);
 }
 
-.selection-mode-range {
-  left: calc(50% - 63px);
+.selection-mode-control {
+  left: calc(50% - 42px);
 }
 
-.selection-mode-individual {
-  left: calc(50% - 21px);
+.selection-mode-control .selection-mode-button {
+  transform: none;
 }
 
 .copy-selection {
@@ -3794,12 +3815,12 @@ html[data-verse-layout="columns"] .translation-label {
     height: 19px;
   }
 
-  .selection-mode-range {
-    left: calc(50% - 78px);
+  .selection-mode-control {
+    left: calc(50% - 52px);
   }
 
-  .selection-mode-individual {
-    left: calc(50% - 26px);
+  .selection-mode-control .selection-mode-button {
+    transform: none;
   }
 
   .copy-selection {

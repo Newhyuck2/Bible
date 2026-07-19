@@ -1645,6 +1645,7 @@ function createPanelElement(panelState, shouldScroll = false) {
   const verseInput = fragment.querySelector(".verse-input");
   const content = fragment.querySelector(".panel-content");
   const copy = fragment.querySelector(".copy-selection");
+  const selectionModeControl = fragment.querySelector(".selection-mode-control");
   const selectionModeRange = fragment.querySelector(".selection-mode-range");
   const selectionModeIndividual = fragment.querySelector(".selection-mode-individual");
   const cancelSelection = fragment.querySelector(".cancel-selection");
@@ -1778,6 +1779,7 @@ function createPanelElement(panelState, shouldScroll = false) {
     verseCombo,
     content,
     copy,
+    selectionModeControl,
     selectionModeRange,
     selectionModeIndividual,
     cancelSelection,
@@ -2058,8 +2060,7 @@ function updatePanelSelection(panelState) {
   });
   elements.panel.classList.toggle("selection-active", hasSelection);
   elements.copy.hidden = !hasSelection;
-  elements.selectionModeRange.hidden = !hasSelection;
-  elements.selectionModeIndividual.hidden = !hasSelection;
+  elements.selectionModeControl.hidden = !hasSelection;
   elements.cancelSelection.hidden = !hasSelection;
   selectionModeButtonState(elements, panelState.selectionMode);
 }
