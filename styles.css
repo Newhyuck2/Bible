@@ -3754,7 +3754,7 @@ html[data-verse-layout="columns"] .translation-label {
     right: auto;
     width: calc(100vw - 24px);
     padding: 4px;
-    grid-template-columns: minmax(112px, 0.78fr) minmax(176px, 1.22fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     grid-auto-columns: auto;
     column-gap: 0;
   }
@@ -3765,6 +3765,7 @@ html[data-verse-layout="columns"] .translation-label {
     overflow: visible;
     font-size: 12px;
     line-height: 1.1;
+    text-overflow: clip;
     white-space: nowrap;
   }
 
