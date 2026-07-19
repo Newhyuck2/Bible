@@ -622,7 +622,7 @@ input:focus {
 .search-action-close {
   position: absolute;
   top: 8px;
-  left: 8px;
+  right: 8px;
 }
 
 .search-action-shell p {
@@ -956,12 +956,13 @@ mark {
   height: 26px;
   padding: 0 5px;
   place-items: center;
-  border: 0;
+  border: 1px solid var(--line);
   border-radius: 6px;
-  background: transparent;
-  color: var(--ink);
-  font-size: 10px;
+  background: white;
+  color: #221f1a;
+  font-size: 16px;
   font-weight: 900;
+  line-height: 1;
 }
 
 .font-size-control button:hover:not(:disabled) {
@@ -1936,12 +1937,13 @@ body * {
   height: 26px;
   padding: 0 5px;
   place-items: center;
-  border: 0;
+  border: 1px solid var(--line);
   border-radius: 6px;
-  background: transparent;
-  color: var(--ink);
-  font-size: 10px;
+  background: white;
+  color: #221f1a;
+  font-size: 16px;
   font-weight: 900;
+  line-height: 1;
 }
 
 .font-size-control button:hover:not(:disabled) {
