@@ -3776,6 +3776,21 @@ html[data-verse-layout="columns"] .translation-label {
   height: 32px;
 }
 
+.site-cross,
+.translation-picker-toggle,
+.header-actions .button {
+  width: 32px;
+  min-width: 32px;
+}
+
+.site-brand,
+.translation-controls,
+.translation-picker,
+.translation-list,
+.header-actions {
+  height: 32px;
+}
+
 .translation-picker,
 .translation-list,
 .translation-chip {
@@ -3788,7 +3803,41 @@ html[data-verse-layout="columns"] .translation-label {
   min-height: 32px;
 }
 
+.site-brand {
+  align-items: center;
+}
+
+.site-cross {
+  height: 32px;
+  border-radius: 8px;
+}
+
+.site-cross svg {
+  width: 18px;
+  height: 18px;
+}
+
+.translation-list {
+  padding: 0;
+}
+
 .translation-chip {
   min-height: 32px;
   align-self: center;
+}
+
+.header-actions .button {
+  padding: 0;
+}
+
+.download-app svg,
+#open-search svg,
+#add-panel svg {
+  width: 15px;
+  height: 15px;
+}
+
+.translation-picker-group-label,
+.combo-menu-heading {
+  color: #5f4630;
 }
