@@ -45,11 +45,6 @@ const searchInput = document.querySelector("#search-input");
 const searchMeta = document.querySelector("#search-meta");
 const searchBookList = document.querySelector("#search-book-list");
 const searchResults = document.querySelector("#search-results");
-const searchActionDialog = document.querySelector("#search-action-dialog");
-const searchActionReference = document.querySelector("#search-action-reference");
-const searchActionViewButton = document.querySelector("#search-action-view");
-const searchActionCopyButton = document.querySelector("#search-action-copy");
-const searchActionCloseButton = document.querySelector("#search-action-close");
 const fontSizeDownButton = document.querySelector("#font-size-down");
 const fontSizeUpButton = document.querySelector("#font-size-up");
 const fontSizeValue = document.querySelector("#font-size-value");
@@ -77,7 +72,6 @@ let state;
 let activePanelId;
 let panelIdCounter = 0;
 let searchRequestId = 0;
-let pendingSearchResult = null;
 let copyPanelState = null;
 let copyTranslationOrder = [];
 let panelMutationInProgress = false;
@@ -2495,7 +2489,6 @@ function openSearch() {
 }
 
 function closeSearch() {
-  closeSearchResultActions();
   searchDialog.close();
 }
 
@@ -2572,10 +2565,11 @@ function renderSearchResults(query, matches, bookCounts, totalTranslationMatches
   }
 
   for (const result of groups) {
-    const button = document.createElement("button");
-    button.className = "search-result";
-    button.type = "button";
-    button.dataset.book = String(result.book);
+    const item = document.createElement("article");
+    item.className = "search-result";
+    item.dataset.book = String(result.book);
+    const content = document.createElement("div");
+    content.className = "search-result-content";
     const reference = document.createElement("div");
     reference.className = "search-reference";
     const referenceText = document.createElement("span");
@@ -2591,7 +2585,7 @@ function renderSearchResults(query, matches, bookCounts, totalTranslationMatches
       referenceText.textContent = `${book.en} ${book.ko} ${result.chapter}:${result.verse}`;
     }
     reference.append(referenceText);
-    button.append(reference);
+    content.append(reference);
 
     const translationOrder = enabledTranslationIds();
     result.lines.sort(
@@ -2608,10 +2602,35 @@ function renderSearchResults(query, matches, bookCounts, totalTranslationMatches
       const text = document.createElement("span");
       appendHighlighted(text, line.text, query);
       row.append(label, text);
-      button.append(row);
+      content.append(row);
     }
-    button.addEventListener("click", () => openSearchResultActions(result));
-    searchResults.append(button);
+    const actions = document.createElement("div");
+    actions.className = "search-result-actions";
+    const viewButton = document.createElement("button");
+    viewButton.type = "button";
+    viewButton.className = "button button-primary icon-only-button search-result-action";
+    viewButton.setAttribute("aria-label", `View ${searchResultReferenceText(result)}`);
+    viewButton.innerHTML = `
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M5 12h14"></path>
+        <path d="m13 6 6 6-6 6"></path>
+      </svg>
+    `;
+    viewButton.addEventListener("click", () => openSearchResult(result));
+    const copyButton = document.createElement("button");
+    copyButton.type = "button";
+    copyButton.className = "button button-secondary icon-only-button search-result-action";
+    copyButton.setAttribute("aria-label", `Copy ${searchResultReferenceText(result)}`);
+    copyButton.innerHTML = `
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="8" y="8" width="11" height="11" rx="2"></rect>
+        <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path>
+      </svg>
+    `;
+    copyButton.addEventListener("click", () => copySearchResult(result));
+    actions.append(viewButton, copyButton);
+    item.append(content, actions);
+    searchResults.append(item);
   }
 }
 
@@ -2645,19 +2664,7 @@ function searchResultReferenceText(result) {
   return `${book.en} ${book.ko} ${result.chapter}:${result.verse}`;
 }
 
-function openSearchResultActions(result) {
-  pendingSearchResult = result;
-  searchActionReference.textContent = searchResultReferenceText(result);
-  searchActionDialog.showModal();
-}
-
-function closeSearchResultActions() {
-  if (searchActionDialog.open) searchActionDialog.close();
-  pendingSearchResult = null;
-}
-
 function openSearchResult(result) {
-  closeSearchResultActions();
   const panelState = state.panels.find((panel) => panel.id === activePanelId) ?? state.panels[0];
   closeSearch();
   const elements = panelElements.get(panelState.id);
@@ -2666,7 +2673,6 @@ function openSearchResult(result) {
 }
 
 async function copySearchResult(result) {
-  closeSearchResultActions();
   const panelState = state.panels.find((panel) => panel.id === activePanelId) ?? state.panels[0];
   const elements = panelElements.get(panelState.id);
   elements.panel.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
@@ -2734,16 +2740,6 @@ openSearchButton.addEventListener("click", openSearch);
 closeSearchButton.addEventListener("click", closeSearch);
 searchDialog.addEventListener("click", (event) => {
   if (event.target === searchDialog) closeSearch();
-});
-searchActionViewButton.addEventListener("click", () => {
-  if (pendingSearchResult) openSearchResult(pendingSearchResult);
-});
-searchActionCopyButton.addEventListener("click", () => {
-  if (pendingSearchResult) copySearchResult(pendingSearchResult);
-});
-searchActionCloseButton.addEventListener("click", closeSearchResultActions);
-searchActionDialog.addEventListener("click", (event) => {
-  if (event.target === searchActionDialog) closeSearchResultActions();
 });
 closeCopyButton.addEventListener("click", closeCopyDialog);
 cancelCopyButton?.addEventListener("click", closeCopyDialog);
