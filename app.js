@@ -1206,6 +1206,12 @@ function setupCombobox({ input, menu, items, selectedValue, matches, onSelect })
     menu.querySelectorAll(".combo-option")[highlighted]?.scrollIntoView({ block: "nearest" });
   }
 
+  function horizontalStep() {
+    if (comboKind === "book" && !input.value.trim()) return 40;
+    if ((comboKind === "chapter" || comboKind === "verse") && !input.value.trim()) return 1;
+    return 0;
+  }
+
   function centerHighlighted() {
     const option = menu.querySelectorAll(".combo-option")[highlighted];
     if (!option) return;
@@ -1251,6 +1257,12 @@ function setupCombobox({ input, menu, items, selectedValue, matches, onSelect })
       event.preventDefault();
       if (menu.hidden) open();
       updateHighlight(highlighted + (event.key === "ArrowDown" ? 1 : -1));
+    } else if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+      const step = horizontalStep();
+      if (!step) return;
+      event.preventDefault();
+      if (menu.hidden) open();
+      updateHighlight(highlighted + (event.key === "ArrowRight" ? step : -step));
     } else if (event.key === "Enter") {
       if (!menu.hidden && filtered.length) {
         event.preventDefault();
