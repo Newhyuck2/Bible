@@ -1596,6 +1596,25 @@ mark {
   text-align: left;
 }
 
+.combo-menu-heading {
+  display: flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 2px 8px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1.1;
+  pointer-events: none;
+  user-select: none;
+}
+
+.chapter-combo .combo-menu-heading,
+.verse-combo .combo-menu-heading {
+  grid-column: 1 / -1;
+}
+
 .combo-option:hover,
 .combo-option.highlighted {
   background: var(--accent-soft);
@@ -3607,7 +3626,7 @@ html[data-verse-layout="columns"] .translation-label {
   min-width: 0;
   grid-auto-columns: minmax(150px, 1fr);
   grid-auto-flow: column;
-  grid-template-rows: repeat(39, minmax(32px, auto));
+  grid-template-rows: repeat(40, minmax(32px, auto));
   max-height: 418px;
 }
 
@@ -3725,5 +3744,14 @@ html[data-verse-layout="columns"] .translation-label {
   .cancel-selection {
     right: auto;
     left: calc(50% + 78px);
+  }
+}
+
+@media (orientation: portrait) and (max-width: 599px) {
+  .book-combo .combo-menu {
+    left: -72px;
+    right: auto;
+    width: calc(100vw - 42px);
+    grid-auto-columns: minmax(0, 1fr);
   }
 }

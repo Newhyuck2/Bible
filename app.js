@@ -1106,6 +1106,13 @@ function setupCombobox({ input, menu, items, selectedValue, matches, onSelect })
   let selected = selectedValue;
   let filtered = [];
   let highlighted = 0;
+  const comboKind = menu.closest(".book-combo")
+    ? "book"
+    : menu.closest(".chapter-combo")
+      ? "chapter"
+      : menu.closest(".verse-combo")
+        ? "verse"
+        : "";
 
   function selectedItem() {
     return allItems.find((item) => item.value === selected);
@@ -1124,6 +1131,13 @@ function setupCombobox({ input, menu, items, selectedValue, matches, onSelect })
     if (notify) onSelect(item.value);
   }
 
+  function menuHeading(text, extraClass = "") {
+    const heading = document.createElement("div");
+    heading.className = `combo-menu-heading${extraClass ? ` ${extraClass}` : ""}`;
+    heading.textContent = text;
+    return heading;
+  }
+
   function render(query = "") {
     filtered = allItems.filter((item) => matches(item, query));
     // With no query, start the list from the current selection instead of
@@ -1131,7 +1145,23 @@ function setupCombobox({ input, menu, items, selectedValue, matches, onSelect })
     const selectedIndex = query.trim() ? -1 : filtered.findIndex((item) => item.value === selected);
     highlighted = selectedIndex >= 0 ? selectedIndex : 0;
     menu.replaceChildren();
+    const emptyQuery = !query.trim();
+    if (emptyQuery && comboKind === "chapter") menu.append(menuHeading("Chapter"));
+    if (emptyQuery && comboKind === "verse") menu.append(menuHeading("Verse"));
+    let addedNewTestamentHeading = false;
+    if (emptyQuery && comboKind === "book") {
+      menu.append(menuHeading("Old Testament", "combo-menu-heading-old"));
+    }
     for (const [index, item] of filtered.entries()) {
+      if (
+        emptyQuery &&
+        comboKind === "book" &&
+        !addedNewTestamentHeading &&
+        item.testament === "new"
+      ) {
+        menu.append(menuHeading("New Testament", "combo-menu-heading-new"));
+        addedNewTestamentHeading = true;
+      }
       const option = document.createElement("button");
       option.type = "button";
       option.className = "combo-option";
@@ -1574,6 +1604,7 @@ function createPanelElement(panelState, shouldScroll = false) {
     label: `${book.en}, ${book.ko}`,
     ko: book.ko,
     en: book.en,
+    testament: index < 39 ? "old" : "new",
   }));
   let chapterCombo;
   let verseCombo;

@@ -8,7 +8,7 @@
     />
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta name="description" content="A compact multi-panel Bible reader" />
-    <meta name="asset-version" content="20260719-7" />
+    <meta name="asset-version" content="20260719-8" />
     <meta name="theme-color" content="#284f43" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -17,7 +17,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" type="image/png" href="./icons/icon-192.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="./icons/icon-180.png" />
-    <link rel="stylesheet" href="./styles.css?v=20260719-7" />
+    <link rel="stylesheet" href="./styles.css?v=20260719-8" />
   </head>
   <body>
     <header class="app-header">
@@ -235,12 +235,14 @@
           <div class="panel-selectors">
             <button class="panel-history panel-history-back" type="button" aria-label="Previous passage in history">
               <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M14 5 8 12l6 7"></path>
+                <path d="M19 12H5"></path>
+                <path d="m11 6-6 6 6 6"></path>
               </svg>
             </button>
             <button class="panel-history panel-history-forward" type="button" aria-label="Next passage in history">
               <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="m10 5 6 7-6 7"></path>
+                <path d="M5 12h14"></path>
+                <path d="m13 6 6 6-6 6"></path>
               </svg>
             </button>
             <div class="selector-control book-selector">
@@ -349,6 +351,6 @@
     </div>
 
     <noscript>JavaScript is required to display the Bible text.</noscript>
-    <script type="module" src="./app.js?v=20260719-7"></script>
+    <script type="module" src="./app.js?v=20260719-8"></script>
   </body>
 </html>
