@@ -1,6 +1,6 @@
-<!doctype html> 
-<html lang="en"> 
-  <head>  
+<!doctype html>
+<html lang="en">
+  <head>
     <meta charset="UTF-8" />
     <meta
       name="viewport"
@@ -8,7 +8,7 @@
     />
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta name="description" content="A compact multi-panel Bible reader" />
-    <meta name="asset-version" content="20260719-1" />
+    <meta name="asset-version" content="20260719-2" />
     <meta name="theme-color" content="#284f43" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -17,10 +17,10 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" type="image/png" href="./icons/icon-192.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="./icons/icon-180.png" />
-    <link rel="stylesheet" href="./styles.css?v=20260719-1" />
+    <link rel="stylesheet" href="./styles.css?v=20260719-2" />
   </head>
   <body>
-    <header class="app-header"> 
+    <header class="app-header">
       <div class="compact-toolbar">
         <div
           class="site-brand"
@@ -30,7 +30,7 @@
           aria-label="Reset to the default view"
           title="Reset to the default view"
         >
-          <span class="site-cross" aria-hidden="true"> 
+          <span class="site-cross" aria-hidden="true">
             <svg viewBox="0 0 24 24">
               <path d="M12 4v16M6.5 9h11"></path>
             </svg>
@@ -48,7 +48,7 @@
               aria-label="Add version"
               title="Add version"
             >
-              <span class="picker-plus" aria-hidden="true">＋</span>
+              <span class="picker-plus" aria-hidden="true">+</span>
               <span class="picker-caret" aria-hidden="true"></span>
             </button>
             <div
@@ -87,9 +87,9 @@
           </button>
         </div>
         <div class="font-size-control" aria-label="Bible text size">
-          <button id="font-size-down" type="button" aria-label="Decrease text size">−</button>
+          <button id="font-size-down" type="button" aria-label="Decrease text size">-</button>
           <output id="font-size-value">14</output>
-          <button id="font-size-up" type="button" aria-label="Increase text size">＋</button>
+          <button id="font-size-up" type="button" aria-label="Increase text size">+</button>
         </div>
         <div class="header-actions">
           <button
@@ -127,14 +127,13 @@
       <div class="search-shell">
         <div class="search-header">
           <div>
-            <h2>Search Bible</h2>
           </div>
-          <button class="icon-button" id="close-search" type="button" aria-label="Close search">×</button>
+          <button class="icon-button close-button" id="close-search" type="button" aria-label="Close search"><span aria-hidden="true"></span></button>
         </div>
 
         <form class="search-form" id="search-form">
           <label class="search-input-wrap" for="search-input">
-            <span aria-hidden="true">⌕</span>
+            <span aria-hidden="true"></span>
             <input
               id="search-input"
               name="query"
@@ -144,7 +143,12 @@
               required
             />
           </label>
-          <button class="button button-primary" type="submit">Search</button>
+          <button class="button button-primary icon-only-button" type="submit" aria-label="Search">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="11" cy="11" r="6"></circle>
+              <path d="m16 16 4 4"></path>
+            </svg>
+          </button>
         </form>
 
         <div class="search-meta" id="search-meta">Enter at least two characters.</div>
@@ -157,11 +161,23 @@
 
     <dialog class="search-action-dialog" id="search-action-dialog">
       <div class="search-action-shell">
+        <button class="icon-button close-button search-action-close" id="search-action-close" type="button" aria-label="Close search result actions">
+          <span aria-hidden="true"></span>
+        </button>
         <p id="search-action-reference"></p>
         <div class="search-action-buttons">
-          <button class="button button-primary" id="search-action-view" type="button">View</button>
-          <button class="button button-secondary" id="search-action-copy" type="button">Copy</button>
-          <button class="button button-secondary" id="search-action-cancel" type="button">Cancel</button>
+          <button class="button button-primary icon-only-button" id="search-action-view" type="button" aria-label="View verse">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M5 12h14"></path>
+              <path d="m13 6 6 6-6 6"></path>
+            </svg>
+          </button>
+          <button class="button button-secondary icon-only-button" id="search-action-copy" type="button" aria-label="Copy verse">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="8" y="8" width="11" height="11" rx="2"></rect>
+              <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path>
+            </svg>
+          </button>
         </div>
       </div>
     </dialog>
@@ -170,10 +186,9 @@
       <div class="copy-shell">
         <div class="copy-header">
           <div>
-            <h2>Copy verses</h2>
             <p id="copy-reference"></p>
           </div>
-          <button class="icon-button" id="close-copy" type="button" aria-label="Close copy options">×</button>
+          <button class="icon-button close-button" id="close-copy" type="button" aria-label="Close copy options"><span aria-hidden="true"></span></button>
         </div>
 
         <fieldset>
@@ -195,8 +210,12 @@
 
         <div class="copy-actions">
           <span class="copy-status" id="copy-status" aria-live="polite"></span>
-          <button class="button button-secondary" id="cancel-copy" type="button">Cancel</button>
-          <button class="button button-primary" id="confirm-copy" type="button">Copy</button>
+          <button class="button button-primary icon-only-button" id="confirm-copy" type="button" aria-label="Copy selected verses">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="8" y="8" width="11" height="11" rx="2"></rect>
+              <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path>
+            </svg>
+          </button>
         </div>
       </div>
     </dialog>
@@ -205,7 +224,7 @@
       <article class="bible-panel">
         <header class="panel-header">
           <div class="panel-selectors">
-            <button class="icon-button remove-panel" type="button" aria-label="Delete panel">×</button>
+            <button class="icon-button close-button remove-panel" type="button" aria-label="Delete panel"><span aria-hidden="true"></span></button>
             <span class="panel-number" aria-label="Panel 1" title="Panel 1">1</span>
             <div class="selector-control book-selector">
               <div class="combo book-combo">
@@ -312,6 +331,6 @@
     </div>
 
     <noscript>JavaScript is required to display the Bible text.</noscript>
-    <script type="module" src="./app.js?v=20260719-1"></script>
+    <script type="module" src="./app.js?v=20260719-2"></script>
   </body>
 </html>

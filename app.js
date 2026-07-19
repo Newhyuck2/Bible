@@ -49,7 +49,7 @@ const searchActionDialog = document.querySelector("#search-action-dialog");
 const searchActionReference = document.querySelector("#search-action-reference");
 const searchActionViewButton = document.querySelector("#search-action-view");
 const searchActionCopyButton = document.querySelector("#search-action-copy");
-const searchActionCancelButton = document.querySelector("#search-action-cancel");
+const searchActionCloseButton = document.querySelector("#search-action-close");
 const fontSizeDownButton = document.querySelector("#font-size-down");
 const fontSizeUpButton = document.querySelector("#font-size-up");
 const fontSizeValue = document.querySelector("#font-size-value");
@@ -453,10 +453,12 @@ function renderTranslationChips() {
 
     const removeButton = document.createElement("button");
     removeButton.type = "button";
-    removeButton.className = "chip-remove";
+    removeButton.className = "chip-remove close-button";
     removeButton.setAttribute("aria-label", `Remove ${meta.label}`);
     removeButton.title = `Remove ${meta.label}`;
-    removeButton.textContent = "×";
+    const removeIcon = document.createElement("span");
+    removeIcon.setAttribute("aria-hidden", "true");
+    removeButton.append(removeIcon);
     removeButton.addEventListener("click", (event) => {
       event.stopPropagation();
       removeTranslation(id);
@@ -2246,7 +2248,6 @@ function openCopyDialog(panelState) {
   if (!selectedVerses.length || !panelState.data) return;
   copyPanelState = panelState;
   copyStatus.textContent = "";
-  confirmCopyButton.textContent = "Copy";
   const book = manifest.books[panelState.book];
   const reference = formatVerseReference(panelState.chapter, selectedVerses);
   copyReference.textContent = `${book.en} ${book.ko} ${reference}`;
@@ -2323,7 +2324,6 @@ async function copySelectedVerses() {
   try {
     await writeClipboard(text);
     copyStatus.textContent = "Copied";
-    confirmCopyButton.textContent = "Copied";
     const copiedPanelState = copyPanelState;
     if (copiedPanelState) clearPanelSelection(copiedPanelState);
     window.setTimeout(closeCopyDialog, 450);
@@ -2517,7 +2517,6 @@ async function copySearchResult(result) {
   panelState.book = result.book;
   panelState.chapter = result.chapter;
   saveState();
-  closeSearch();
   const elements = panelElements.get(panelState.id);
   elements.panel.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
   const loaded = await loadPanel(panelState, result.verse);
@@ -2587,12 +2586,12 @@ searchActionViewButton.addEventListener("click", () => {
 searchActionCopyButton.addEventListener("click", () => {
   if (pendingSearchResult) copySearchResult(pendingSearchResult);
 });
-searchActionCancelButton.addEventListener("click", closeSearchResultActions);
+searchActionCloseButton.addEventListener("click", closeSearchResultActions);
 searchActionDialog.addEventListener("click", (event) => {
   if (event.target === searchActionDialog) closeSearchResultActions();
 });
 closeCopyButton.addEventListener("click", closeCopyDialog);
-cancelCopyButton.addEventListener("click", closeCopyDialog);
+cancelCopyButton?.addEventListener("click", closeCopyDialog);
 confirmCopyButton.addEventListener("click", copySelectedVerses);
 copyDialog.addEventListener("click", (event) => {
   if (event.target === copyDialog) closeCopyDialog();
