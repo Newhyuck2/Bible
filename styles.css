@@ -1427,6 +1427,17 @@ mark {
   height: 44px;
   min-height: 44px;
   padding: 0;
+  border-color: var(--line-strong);
+  background: white;
+  box-shadow: none;
+  color: var(--ink);
+}
+
+#confirm-copy:hover {
+  border-color: #9d968b;
+  background: #f8f6f1;
+  color: var(--ink);
+  transform: none;
 }
 
 @media (max-width: 760px) {
@@ -2997,6 +3008,10 @@ body * {
   right: 52px;
   left: auto;
   transform: none;
+  border-color: var(--line-strong);
+  background: white;
+  box-shadow: 0 5px 14px rgba(37, 35, 31, 0.14);
+  color: var(--ink);
 }
 
 .cancel-selection {
@@ -3038,9 +3053,11 @@ body * {
 }
 
 .selection-mode-button:hover,
-.cancel-selection:hover {
+.cancel-selection:hover,
+.copy-selection:hover {
   border-color: #9d968b;
   background: #f8f6f1;
+  color: var(--ink);
 }
 
 .selection-mode-button.selected,
