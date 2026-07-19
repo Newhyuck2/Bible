@@ -3752,8 +3752,25 @@ html[data-verse-layout="columns"] .translation-label {
   .book-combo .combo-menu {
     left: -72px;
     right: auto;
-    width: calc(100vw - 42px);
+    width: calc(100vw - 24px);
+    padding: 4px;
     grid-auto-columns: minmax(0, 1fr);
+  }
+
+  .book-combo .combo-option {
+    min-height: 30px;
+    padding: 4px 2px;
+    overflow: visible;
+    font-size: 9.5px;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .book-combo .combo-menu-heading {
+    min-height: 30px;
+    padding: 2px;
+    font-size: 8.5px;
+    white-space: nowrap;
   }
 }
 

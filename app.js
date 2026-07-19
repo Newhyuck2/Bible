@@ -1198,11 +1198,12 @@ function setupCombobox({ input, menu, items, selectedValue, matches, onSelect })
   // Opening fresh empties the input (ready to type) and shows the full list
   // scrolled so the current selection sits centered; the selection itself is
   // kept and snaps back if the menu is left without choosing.
-  function open(clearText = false) {
+  function open(clearText = false, focusInput = false) {
     if (clearText) input.value = "";
     render(clearText ? "" : input.value === selectedItem()?.label ? "" : input.value);
     menu.hidden = false;
     input.setAttribute("aria-expanded", "true");
+    if (focusInput) input.focus({ preventScroll: true });
     centerHighlighted();
   }
 
@@ -1609,7 +1610,7 @@ function createPanelElement(panelState, shouldScroll = false) {
   let chapterCombo;
   let verseCombo;
   const openComboSoon = (combo) => {
-    requestAnimationFrame(() => combo.open(true));
+    requestAnimationFrame(() => combo.open(true, !mobileLayout.matches));
   };
   const ensureDraft = () => {
     if (!panelState.pendingPassage) panelState.pendingPassage = currentPassage(panelState);
