@@ -1214,30 +1214,44 @@ function setupCombobox({ input, menu, items, selectedValue, matches, onSelect })
   }
 
   function keyboardTarget(key) {
-    const emptyQuery = !input.value.trim();
-    if (!emptyQuery) {
-      if (key === "ArrowDown") return highlighted + 1;
-      if (key === "ArrowUp") return highlighted - 1;
-      return null;
+    const options = [...menu.querySelectorAll(".combo-option")];
+    const current = options[highlighted];
+    if (!current) return null;
+    const currentRect = current.getBoundingClientRect();
+    const currentX = currentRect.left + currentRect.width / 2;
+    const currentY = currentRect.top + currentRect.height / 2;
+    const sameRowTolerance = currentRect.height * 0.55;
+    const sameColumnTolerance = currentRect.width * 0.55;
+    let bestIndex = null;
+    let bestScore = Number.POSITIVE_INFINITY;
+    for (const [index, option] of options.entries()) {
+      if (index === highlighted) continue;
+      const rect = option.getBoundingClientRect();
+      const x = rect.left + rect.width / 2;
+      const y = rect.top + rect.height / 2;
+      const dx = x - currentX;
+      const dy = y - currentY;
+      let valid = false;
+      let score = Number.POSITIVE_INFINITY;
+      if (key === "ArrowRight" && dx > 0 && Math.abs(dy) <= sameRowTolerance) {
+        valid = true;
+        score = dx + Math.abs(dy) * 8;
+      } else if (key === "ArrowLeft" && dx < 0 && Math.abs(dy) <= sameRowTolerance) {
+        valid = true;
+        score = Math.abs(dx) + Math.abs(dy) * 8;
+      } else if (key === "ArrowDown" && dy > 0 && Math.abs(dx) <= sameColumnTolerance) {
+        valid = true;
+        score = dy + Math.abs(dx) * 8;
+      } else if (key === "ArrowUp" && dy < 0 && Math.abs(dx) <= sameColumnTolerance) {
+        valid = true;
+        score = Math.abs(dy) + Math.abs(dx) * 8;
+      }
+      if (valid && score < bestScore) {
+        bestScore = score;
+        bestIndex = index;
+      }
     }
-    if (comboKind === "book") {
-      const isNewTestament = highlighted >= 39;
-      const row = isNewTestament ? highlighted - 39 : highlighted;
-      const columnSize = isNewTestament ? 27 : 39;
-      if (key === "ArrowDown") return row + 1 < columnSize ? highlighted + 1 : null;
-      if (key === "ArrowUp") return row > 0 ? highlighted - 1 : null;
-      if (key === "ArrowRight") return !isNewTestament && row < 27 ? 39 + row : null;
-      if (key === "ArrowLeft") return isNewTestament ? row : null;
-    }
-    if (comboKind === "chapter" || comboKind === "verse") {
-      const columns = 5;
-      const column = highlighted % columns;
-      if (key === "ArrowDown") return highlighted + columns;
-      if (key === "ArrowUp") return highlighted - columns;
-      if (key === "ArrowRight") return column < columns - 1 ? highlighted + 1 : null;
-      if (key === "ArrowLeft") return column > 0 ? highlighted - 1 : null;
-    }
-    return null;
+    return bestIndex;
   }
 
   function centerHighlighted() {
@@ -1287,10 +1301,9 @@ function setupCombobox({ input, menu, items, selectedValue, matches, onSelect })
       event.key === "ArrowLeft" ||
       event.key === "ArrowRight"
     ) {
-      const nextIndex = keyboardTarget(event.key);
-      if (nextIndex == null && input.value.trim()) return;
       event.preventDefault();
       if (menu.hidden) open();
+      const nextIndex = keyboardTarget(event.key);
       if (nextIndex != null) moveHighlight(nextIndex);
     } else if (event.key === "Enter") {
       if (!menu.hidden && filtered.length) {
