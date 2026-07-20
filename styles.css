@@ -2715,7 +2715,6 @@ body * {
   }
 }
 
-.update-banner,
 .install-hint {
   position: fixed;
   left: 50%;
@@ -2739,12 +2738,10 @@ body * {
   line-height: 1.45;
 }
 
-.update-banner[hidden],
 .install-hint[hidden] {
   display: none;
 }
 
-.update-banner button,
 .install-hint button {
   padding: 7px 13px;
   border: 0;
@@ -2760,7 +2757,6 @@ body * {
   padding: 5px 11px;
 }
 
-.update-banner button:hover,
 .install-hint button:hover {
   background: var(--accent-hover);
 }

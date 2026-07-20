@@ -60,8 +60,6 @@ const copyReference = document.querySelector("#copy-reference");
 const copyTranslations = document.querySelector("#copy-translations");
 const copyStatus = document.querySelector("#copy-status");
 const siteBrand = document.querySelector("#site-brand");
-const updateBanner = document.querySelector("#update-banner");
-const updateReloadButton = document.querySelector("#update-reload");
 const downloadAppButton = document.querySelector("#download-app");
 const downloadAppLabel = document.querySelector("#download-app-label");
 const installHint = document.querySelector("#install-hint");
@@ -2837,21 +2835,6 @@ phonePortraitLayout.addEventListener("change", schedulePanelLayoutAlignment);
 touchPanelToggleLayout.addEventListener("change", schedulePanelLayoutAlignment);
 touchPanelToggleLayout.addEventListener("change", syncTrackFreeScroll);
 
-// GitHub Pages' CDN can keep serving a stale index.html/app.js for a while
-// after a deploy, and an already-open tab never re-fetches it on its own.
-// Poll a tiny no-store JSON file so both cases surface a manual refresh
-// prompt instead of silently showing outdated content.
-async function checkForUpdate() {
-  try {
-    const response = await fetch(`./version.json?_=${Date.now()}`, { cache: "no-store" });
-    if (!response.ok) return;
-    const data = await response.json();
-    if (data.build && data.build !== ASSET_VERSION) updateBanner.hidden = false;
-  } catch {
-    // Offline or blocked request; the next scheduled check will retry.
-  }
-}
-
 // ---- Offline install ----
 // The service worker mirrors every successful same-origin response into the
 // offline cache; the header install button additionally triggers the
@@ -2996,12 +2979,5 @@ installHintClose.addEventListener("click", () => {
   installHint.hidden = true;
 });
 updateDownloadButton();
-
-updateReloadButton.addEventListener("click", () => window.location.reload());
-document.addEventListener("visibilitychange", () => {
-  if (!document.hidden) checkForUpdate();
-});
-window.setInterval(checkForUpdate, 5 * 60 * 1000);
-checkForUpdate();
 
 init();
