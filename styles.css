@@ -3957,3 +3957,21 @@ html[data-verse-layout="columns"] .translation-label {
 .combo-menu-heading {
   color: #5f4630;
 }
+
+@media (max-width: 1366px) and (any-pointer: coarse) {
+  .compact-toolbar .translation-controls,
+  .compact-toolbar .translation-list {
+    height: 34px;
+    min-height: 34px;
+  }
+
+  .compact-toolbar .translation-list {
+    padding-block: 1px;
+    align-items: center;
+  }
+
+  .compact-toolbar .translation-chip {
+    height: 32px;
+    min-height: 32px;
+  }
+}
