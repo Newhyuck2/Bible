@@ -3121,11 +3121,14 @@ body * {
     left: 12px;
     width: auto;
     padding: 2px;
+    align-items: center;
   }
 
   .selection-mode-button {
+    display: grid;
     width: 40px;
     height: 38px;
+    place-items: center;
   }
 
   .copy-selection {
@@ -3816,7 +3819,7 @@ html[data-verse-layout="columns"] .translation-label {
   }
 
   .selection-mode-control {
-    left: calc(50% - 52px);
+    left: calc(50% - 68px);
   }
 
   .selection-mode-control .selection-mode-button {
@@ -3825,12 +3828,12 @@ html[data-verse-layout="columns"] .translation-label {
 
   .copy-selection {
     right: auto;
-    left: calc(50% + 26px);
+    left: calc(50% + 24px);
   }
 
   .cancel-selection {
     right: auto;
-    left: calc(50% + 78px);
+    left: calc(50% + 76px);
   }
 }
 
