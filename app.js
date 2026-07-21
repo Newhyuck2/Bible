@@ -91,7 +91,7 @@ const searchWorker = new Worker(`./search-worker.js?v=${ASSET_VERSION}`);
 function freshState() {
   return {
     enabledTranslations: ["NIV", "GAE"],
-    fontSize: 14,
+    fontSize: 16,
     touchPanelCount: null,
     desktopPanelMode: null,
     verseLayout: "stacked",
@@ -121,7 +121,7 @@ function sanitizeState() {
     delete state.translationOrder;
   }
   state.enabledTranslations = [...new Set(enabled)];
-  state.fontSize = Math.max(10, Math.min(Number(state.fontSize) || 14, 22));
+  state.fontSize = Math.max(10, Math.min(Number(state.fontSize) || 16, 22));
   state.verseLayout = state.verseLayout === "columns" ? "columns" : "stacked";
   state.copySelectionMode = state.copySelectionMode === "individual" ? "individual" : "range";
   const savedPanelCount = Number(state.touchPanelCount);
