@@ -2721,7 +2721,7 @@ function runSearch(query) {
     return;
   }
   searchRequestId += 1;
-  searchMeta.textContent = `Preparing search data for “${query}”…`;
+  searchMeta.textContent = "";
   searchWorker.postMessage({ type: "search", requestId: searchRequestId, query, translations });
 }
 
@@ -2729,7 +2729,7 @@ searchWorker.addEventListener("message", (event) => {
   const message = event.data;
   if (message.requestId !== searchRequestId) return;
   if (message.type === "progress") {
-    searchMeta.textContent = message.text;
+    searchMeta.textContent = "";
   } else if (message.type === "result") {
     renderSearchResults(
       message.query,
@@ -2757,8 +2757,7 @@ function renderSearchResults(query, matches, bookCounts, totalTranslationMatches
     (a, b) => a.book - b.book || a.chapter - b.chapter || a.verse - b.verse,
   );
 
-  const totalVerses = bookCounts.reduce((sum, [, count]) => sum + count, 0);
-  searchMeta.textContent = `${totalVerses.toLocaleString()} verses · ${totalTranslationMatches.toLocaleString()} translation matches · ${(elapsedMs / 1000).toFixed(1)}s${truncated ? " · Top results shown" : ""}`;
+  searchMeta.textContent = "";
 
   if (!groups.length) {
     const empty = document.createElement("div");
