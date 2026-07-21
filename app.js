@@ -1,4 +1,5 @@
 const STORAGE_KEY = "side-by-side-bible:v1";
+const RELOAD_RESET_KEY = "side-by-side-bible:reset-on-load";
 const TRANSLATION_COLORS = {
   ESV: "#9b5c34",
   NIV: "#476f9b",
@@ -430,7 +431,12 @@ function resetSite() {
 
 function resetStoredStateForReload() {
   const navigation = performance.getEntriesByType?.("navigation")?.[0];
-  if (navigation?.type === "reload") localStorage.removeItem(STORAGE_KEY);
+  const legacyReload = performance.navigation?.type === 1;
+  const flaggedReload = sessionStorage.getItem(RELOAD_RESET_KEY) === "1";
+  sessionStorage.removeItem(RELOAD_RESET_KEY);
+  if (navigation?.type === "reload" || legacyReload || flaggedReload) {
+    localStorage.removeItem(STORAGE_KEY);
+  }
 }
 
 function translationMeta(id) {
@@ -1622,10 +1628,27 @@ function setPanelChromeHidden(panelOrState, hidden) {
 function revealPanelChrome(panel, preserveContent = false) {
   if (!panel?.classList.contains("touch-chrome-hidden")) return;
   const content = panel.querySelector(".panel-content");
-  const header = panel.querySelector(".panel-header");
-  const offset = preserveContent ? Math.ceil(header?.scrollHeight || 0) : 0;
+  const anchor = preserveContent ? captureContentAnchor(content) : null;
   setPanelChromeHidden(panel, false);
-  if (offset && content) content.scrollTop += offset;
+  restoreContentAnchor(content, anchor);
+  requestAnimationFrame(() => restoreContentAnchor(content, anchor));
+  window.setTimeout(() => restoreContentAnchor(content, anchor), 90);
+  window.setTimeout(() => restoreContentAnchor(content, anchor), 190);
+}
+
+function captureContentAnchor(content) {
+  if (!content) return null;
+  const contentRect = content.getBoundingClientRect();
+  const verse = [...content.querySelectorAll(".verse-group")]
+    .find((group) => group.getBoundingClientRect().bottom > contentRect.top + 1);
+  if (!verse) return { element: content, top: contentRect.top };
+  return { element: verse, top: verse.getBoundingClientRect().top };
+}
+
+function restoreContentAnchor(content, anchor) {
+  if (!content || !anchor?.element?.isConnected) return;
+  const drift = anchor.element.getBoundingClientRect().top - anchor.top;
+  if (Math.abs(drift) > 0.5) content.scrollTop += drift;
 }
 
 // Horizontal touch drags on a panel pan the track by hand, following the
@@ -1659,7 +1682,7 @@ function setupPanelSwipe(panel) {
   panel.addEventListener("click", (event) => {
     if (suppressClick) {
       event.preventDefault();
-      event.stopPropagation();
+      event.stopImmediatePropagation();
       return;
     }
     if (!mobileLayout.matches || !panel.classList.contains("touch-chrome-hidden")) return;
@@ -3183,3 +3206,7 @@ installHintClose.addEventListener("click", () => {
 updateDownloadButton();
 
 init();
+
+window.addEventListener("pagehide", () => {
+  sessionStorage.setItem(RELOAD_RESET_KEY, "1");
+});
