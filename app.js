@@ -1677,9 +1677,23 @@ function setupPanelSwipe(panel) {
   const shouldIgnoreSwipeStart = (target) => (
     target.closest("button, input, textarea, select, .combo-menu, .panel-resize-handle")
   );
+  // A touch that lands while the content is still coasting from momentum
+  // scrolling is meant to arrest that motion, not to ask for the chrome
+  // back — let it stop the scroll natively instead of also revealing.
+  const CHROME_REVEAL_SCROLL_SETTLE_MS = 150;
+  const isContentCoasting = (content) => (
+    Boolean(content) && performance.now() - (content._lastScrollAt ?? 0) < CHROME_REVEAL_SCROLL_SETTLE_MS
+  );
   const revealHiddenChromeFromPress = (event) => {
     if (!mobileLayout.matches || !panel.classList.contains("touch-chrome-hidden")) return false;
     if (shouldIgnoreSwipeStart(event.target)) return false;
+    if (isContentCoasting(panel.querySelector(".panel-content"))) {
+      suppressClick = true;
+      window.setTimeout(() => {
+        suppressClick = false;
+      }, 350);
+      return false;
+    }
     cancelPanelGlide();
     revealPanelChrome(panel, true);
     event.preventDefault();
@@ -1960,6 +1974,7 @@ function createPanelElement(panelState, shouldScroll = false) {
   panel.addEventListener("pointerdown", () => setActivePanel(id));
   panel.addEventListener("focusin", () => setActivePanel(id));
   content.addEventListener("scroll", () => {
+    content._lastScrollAt = performance.now();
     if (content.scrollTop <= 1) setPanelChromeHidden(panel, false);
   }, { passive: true });
 
