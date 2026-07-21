@@ -42,6 +42,10 @@ const openSearchButton = document.querySelector("#open-search");
 const closeSearchButton = document.querySelector("#close-search");
 const searchForm = document.querySelector("#search-form");
 const searchInput = document.querySelector("#search-input");
+const searchTranslationList = document.querySelector("#search-translation-list");
+const searchTranslationPicker = document.querySelector("#search-translation-picker");
+const searchTranslationPickerToggle = document.querySelector("#search-translation-picker-toggle");
+const searchTranslationPickerMenu = document.querySelector("#search-translation-picker-menu");
 const searchMeta = document.querySelector("#search-meta");
 const searchBookList = document.querySelector("#search-book-list");
 const searchResults = document.querySelector("#search-results");
@@ -58,6 +62,9 @@ const cancelCopyButton = document.querySelector("#cancel-copy");
 const confirmCopyButton = document.querySelector("#confirm-copy");
 const copyReference = document.querySelector("#copy-reference");
 const copyTranslations = document.querySelector("#copy-translations");
+const copyTranslationPicker = document.querySelector("#copy-translation-picker");
+const copyTranslationPickerToggle = document.querySelector("#copy-translation-picker-toggle");
+const copyTranslationPickerMenu = document.querySelector("#copy-translation-picker-menu");
 const copyStatus = document.querySelector("#copy-status");
 const siteBrand = document.querySelector("#site-brand");
 const downloadAppButton = document.querySelector("#download-app");
@@ -72,6 +79,9 @@ let panelIdCounter = 0;
 let searchRequestId = 0;
 let copyPanelState = null;
 let copyTranslationOrder = [];
+let copyTranslationControl = null;
+let searchTranslationOrder = [];
+let searchTranslationControl = null;
 let panelMutationInProgress = false;
 let panelLayoutFrame = 0;
 const chapterCache = new Map();
@@ -412,7 +422,7 @@ function resetSite() {
   saveState();
 
   searchInput.value = "";
-  searchMeta.textContent = "Enter at least two characters.";
+  searchMeta.textContent = "Enter at least one character.";
   searchBookList.replaceChildren();
   searchResults.replaceChildren();
   searchRequestId += 1;
@@ -437,13 +447,28 @@ function renderTranslationControls() {
   if (!translationPickerMenu.hidden) renderTranslationPickerMenu();
 }
 
-// The chip row shows only the translations currently in use. New picks slot
-// near canonical order, while the handle lets touch users customize the row.
-function renderTranslationChips() {
-  translationList.replaceChildren();
+function insertTranslationInOrder(order, id) {
+  if (!translationMeta(id) || order.includes(id)) return false;
+  const rank = canonicalTranslationRank(id);
+  let index = order.findIndex((existing) => canonicalTranslationRank(existing) > rank);
+  if (index < 0) index = order.length;
+  order.splice(index, 0, id);
+  return true;
+}
 
-  for (const id of enabledTranslationIds()) {
+function moveTranslationInOrder(order, from, to) {
+  if (from < 0 || to < 0 || from >= order.length || to >= order.length) return false;
+  const [item] = order.splice(from, 1);
+  order.splice(to, 0, item);
+  return true;
+}
+
+function renderTranslationChipList({ list, order, onRemove, onMove }) {
+  list.replaceChildren();
+
+  for (const id of order) {
     const meta = translationMeta(id);
+    if (!meta) continue;
     const chip = document.createElement("div");
     chip.className = "translation-chip";
     chip.draggable = true;
@@ -458,11 +483,11 @@ function renderTranslationChips() {
     setupTouchReorder({
       item: chip,
       handle,
-      container: translationList,
+      container: list,
       itemClass: "translation-chip",
       id,
-      getOrder: () => state.enabledTranslations,
-      onReorder: moveTranslation,
+      getOrder: () => order,
+      onReorder: onMove,
     });
 
     const name = document.createElement("span");
@@ -481,7 +506,7 @@ function renderTranslationChips() {
     removeButton.append(removeIcon);
     removeButton.addEventListener("click", (event) => {
       event.stopPropagation();
-      removeTranslation(id);
+      onRemove(id);
     });
     removeButton.addEventListener("pointerdown", (event) => event.stopPropagation());
 
@@ -495,27 +520,32 @@ function renderTranslationChips() {
     chip.addEventListener("drop", (event) => {
       event.preventDefault();
       const draggedId = event.dataTransfer.getData("text/plain");
-      const from = state.enabledTranslations.indexOf(draggedId);
-      const to = state.enabledTranslations.indexOf(id);
-      if (from >= 0 && to >= 0 && from !== to) moveTranslation(from, to);
+      const from = order.indexOf(draggedId);
+      const to = order.indexOf(id);
+      if (from >= 0 && to >= 0 && from !== to) onMove(from, to);
     });
 
     chip.append(handle, name, removeButton);
-    translationList.append(chip);
+    list.append(chip);
   }
+}
+
+// The chip row shows only the translations currently in use. New picks slot
+// near canonical order, while the handle lets touch users customize the row.
+function renderTranslationChips() {
+  renderTranslationChipList({
+    list: translationList,
+    order: enabledTranslationIds(),
+    onRemove: removeTranslation,
+    onMove: moveTranslation,
+  });
 }
 
 // A newly picked version slots into the canonical ESV→NIV→KJV→NASB→NRSV→
 // 개역개정→새번역→우리말→新译本 order (before the first chip that ranks
 // after it), rather than appending at the end.
 function addTranslation(id) {
-  if (!translationMeta(id) || state.enabledTranslations.includes(id)) return;
-  const rank = canonicalTranslationRank(id);
-  let index = state.enabledTranslations.findIndex(
-    (existing) => canonicalTranslationRank(existing) > rank,
-  );
-  if (index < 0) index = state.enabledTranslations.length;
-  state.enabledTranslations.splice(index, 0, id);
+  if (!insertTranslationInOrder(state.enabledTranslations, id)) return;
   saveState();
   renderTranslationControls();
   applyVerseLayout();
@@ -530,9 +560,7 @@ function removeTranslation(id) {
 }
 
 function moveTranslation(from, to) {
-  if (from < 0 || to < 0 || from >= state.enabledTranslations.length || to >= state.enabledTranslations.length) return;
-  const [item] = state.enabledTranslations.splice(from, 1);
-  state.enabledTranslations.splice(to, 0, item);
+  if (!moveTranslationInOrder(state.enabledTranslations, from, to)) return;
   saveState();
   renderTranslationControls();
   applyVerseLayout();
@@ -830,6 +858,152 @@ setupPressDragPick({
   },
 });
 
+function renderDialogTranslationPickerMenu({ menu, picker, getOrder, onToggle }) {
+  menu.replaceChildren();
+  if (!manifest) return;
+  const order = getOrder();
+  for (const group of TRANSLATION_GROUPS) {
+    const ids = group.ids.filter((id) => translationMeta(id));
+    if (!ids.length) continue;
+    const section = document.createElement("div");
+    section.className = "translation-picker-group";
+    const heading = document.createElement("div");
+    heading.className = "translation-picker-group-label";
+    heading.textContent = group.label;
+    section.append(heading);
+    for (const id of ids) {
+      const meta = translationMeta(id);
+      const isEnabled = order.includes(id);
+      const option = document.createElement("button");
+      option.type = "button";
+      option.className = "translation-picker-option";
+      option.classList.toggle("selected", isEnabled);
+      option.dataset.translation = id;
+      option.setAttribute("role", "option");
+      option.setAttribute("aria-selected", String(isEnabled));
+
+      const label = document.createElement("span");
+      label.className = "picker-label";
+      label.lang = translationLanguage(id);
+      label.textContent = meta.label;
+      label.style.setProperty("--translation-color", TRANSLATION_COLORS[id]);
+      const name = document.createElement("span");
+      name.className = "picker-name";
+      name.textContent = meta.name;
+
+      option.addEventListener("click", () => {
+        onToggle(id);
+        renderDialogTranslationPickerMenu({ menu, picker, getOrder, onToggle });
+        positionTranslationPickerMenuFor(picker, menu);
+      });
+      option.append(label, name);
+      section.append(option);
+    }
+    menu.append(section);
+  }
+}
+
+function positionTranslationPickerMenuFor(picker, menu) {
+  if (menu.hidden) return;
+  menu.style.right = "auto";
+  menu.style.left = "0";
+  const width = menu.getBoundingClientRect().width;
+  const anchor = picker.getBoundingClientRect();
+  const left = Math.max(8, Math.min(anchor.left, window.innerWidth - width - 8));
+  menu.style.left = `${left - anchor.left}px`;
+}
+
+function setupDialogTranslationControl({ picker, toggle, menu, list, getOrder, setOrder, onChange }) {
+  let suppressClickUntil = 0;
+  let openedByTouchPress = false;
+
+  const render = () => {
+    renderTranslationChipList({
+      list,
+      order: getOrder(),
+      onRemove: (id) => {
+        setOrder(getOrder().filter((item) => item !== id));
+        render();
+        onChange?.();
+      },
+      onMove: (from, to) => {
+        const order = [...getOrder()];
+        if (!moveTranslationInOrder(order, from, to)) return;
+        setOrder(order);
+        render();
+        onChange?.();
+      },
+    });
+    if (!menu.hidden) renderDialogTranslationPickerMenu({ menu, picker, getOrder, onToggle });
+  };
+
+  const onToggle = (id) => {
+    const order = [...getOrder()];
+    if (order.includes(id)) {
+      setOrder(order.filter((item) => item !== id));
+    } else if (insertTranslationInOrder(order, id)) {
+      setOrder(order);
+    }
+    render();
+    onChange?.();
+  };
+
+  const open = () => {
+    if (!menu.hidden) return;
+    renderDialogTranslationPickerMenu({ menu, picker, getOrder, onToggle });
+    menu.hidden = false;
+    positionTranslationPickerMenuFor(picker, menu);
+    toggle.setAttribute("aria-expanded", "true");
+  };
+
+  const close = () => {
+    openedByTouchPress = false;
+    if (menu.hidden) return;
+    menu.hidden = true;
+    toggle.setAttribute("aria-expanded", "false");
+  };
+
+  toggle.addEventListener("click", () => {
+    const openedByThisPress = openedByTouchPress;
+    openedByTouchPress = false;
+    if (Date.now() < suppressClickUntil) return;
+    if (menu.hidden) open();
+    else if (!openedByThisPress) close();
+  });
+
+  document.addEventListener(
+    "pointerdown",
+    (event) => {
+      if (menu.hidden) return;
+      if (picker.contains(event.target)) return;
+      close();
+      shieldOutsidePress(event);
+    },
+    true,
+  );
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !menu.hidden) close();
+  });
+
+  setupPressDragPick({
+    opener: toggle,
+    menu,
+    optionSelector: ".translation-picker-option",
+    onOpen: () => {
+      if (!menu.hidden) return;
+      open();
+      openedByTouchPress = true;
+    },
+    onPick: (option) => option.click(),
+    onGestureEnd: () => {
+      suppressClickUntil = Date.now() + 500;
+    },
+  });
+
+  return { render, open, close };
+}
+
 const HANGUL_INITIALS = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ";
 
 function hangulInitials(value) {
@@ -859,6 +1033,9 @@ syncTrackFreeScroll();
 mobileLayout.addEventListener("change", () => {
   updatePanelCountControls();
   syncTrackFreeScroll();
+  if (!mobileLayout.matches) {
+    for (const { panel } of panelElements.values()) setPanelChromeHidden(panel, false);
+  }
 });
 
 // Swallow the press that closed an open dropdown so it cannot reach — and
@@ -1407,6 +1584,14 @@ function snapTouchPanelsAfterSwipe({ velocityX = 0, startIndex = null, totalDelt
   return true;
 }
 
+function setPanelChromeHidden(panelOrState, hidden) {
+  const panel = panelOrState instanceof Element
+    ? panelOrState
+    : panelElements.get(panelOrState?.id)?.panel;
+  if (!panel) return;
+  panel.classList.toggle("touch-chrome-hidden", Boolean(hidden && mobileLayout.matches));
+}
+
 // Horizontal touch drags on a panel pan the track by hand, following the
 // finger position directly with momentum on release.
 function setupPanelSwipe(panel) {
@@ -1423,9 +1608,16 @@ function setupPanelSwipe(panel) {
   );
 
   panel.addEventListener("click", (event) => {
-    if (!suppressClick) return;
+    if (suppressClick) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+    if (!mobileLayout.matches || !panel.classList.contains("touch-chrome-hidden")) return;
+    if (shouldIgnoreSwipeStart(event.target)) return;
+    setPanelChromeHidden(panel, false);
     event.preventDefault();
-    event.stopPropagation();
+    event.stopImmediatePropagation();
   }, true);
 
   panel.addEventListener("touchstart", (event) => {
@@ -1435,7 +1627,7 @@ function setupPanelSwipe(panel) {
       document.body.classList.remove("swiping-panels");
       return;
     }
-    if (!mobileLayout.matches || state.panels.length < 2) return;
+    if (!mobileLayout.matches) return;
     if (shouldIgnoreSwipeStart(event.target)) return;
     const touch = event.touches[0];
     gesture = {
@@ -1469,8 +1661,10 @@ function setupPanelSwipe(panel) {
 
     if (!gesture.axis && Math.max(distanceX, distanceY) >= 3) {
       gesture.axis = distanceX > distanceY ? "horizontal" : "vertical";
+      setPanelChromeHidden(panel, true);
     }
     if (gesture.axis !== "horizontal") return;
+    if (state.panels.length < 2) return;
 
     event.preventDefault();
     document.body.classList.add("swiping-panels");
@@ -1486,6 +1680,7 @@ function setupPanelSwipe(panel) {
     if (!gesture) return;
     const touch = findTouch(event.changedTouches, gesture.touchId);
     if (!touch) return;
+    const hadDrag = Boolean(gesture.axis);
     if (gesture.axis === "horizontal") {
       const samples = gesture.samples;
       const first = samples[0];
@@ -1507,6 +1702,11 @@ function setupPanelSwipe(panel) {
       window.setTimeout(() => {
         suppressClick = false;
       }, 400);
+    } else if (hadDrag) {
+      suppressClick = true;
+      window.setTimeout(() => {
+        suppressClick = false;
+      }, 300);
     }
     document.body.classList.remove("swiping-panels");
     gesture = null;
@@ -2184,6 +2384,7 @@ async function loadPanel(panelState, targetVerse = null) {
 }
 
 async function goToPassage(panelState, passage, { record = true } = {}) {
+  setPanelChromeHidden(panelState, false);
   const target = normalizePassage(passage.book, passage.chapter, passage.verse);
   const chapterChanged = panelState.book !== target.book || panelState.chapter !== target.chapter || !panelState.data;
   panelState.book = target.book;
@@ -2369,93 +2570,6 @@ function changeFontSize(delta) {
   saveState();
 }
 
-function renderCopyTranslationOptions(checkedTranslations = null) {
-  const checked = checkedTranslations ?? new Set(
-    [...copyTranslations.querySelectorAll(".copy-translation-option.selected")]
-      .map((item) => item.dataset.translation),
-  );
-  copyTranslations.replaceChildren();
-
-  copyTranslationOrder.forEach((translation) => {
-    const item = document.createElement("div");
-    item.className = "copy-translation-option";
-    item.classList.toggle("selected", checked.has(translation));
-    item.draggable = true;
-    item.dataset.translation = translation;
-    item.tabIndex = 0;
-    item.setAttribute("role", "checkbox");
-    item.setAttribute("aria-checked", String(checked.has(translation)));
-    item.setAttribute("aria-label", `${translationMeta(translation).label} translation`);
-
-    const handle = document.createElement("span");
-    handle.className = "copy-drag-handle";
-    handle.textContent = "⠿";
-    handle.title = "Drag to reorder";
-    setupTouchReorder({
-      item,
-      handle,
-      container: copyTranslations,
-      itemClass: "copy-translation-option",
-      id: translation,
-      getOrder: () => copyTranslationOrder,
-      onReorder: moveCopyTranslation,
-    });
-
-    const text = document.createElement("span");
-    text.className = "copy-translation-name";
-    text.lang = translationLanguage(translation);
-    text.textContent = translationMeta(translation).label;
-    text.style.setProperty("--translation-color", TRANSLATION_COLORS[translation]);
-
-    const check = document.createElement("span");
-    check.className = "copy-check";
-    check.setAttribute("aria-hidden", "true");
-
-    item.addEventListener("dragstart", (event) => {
-      item.classList.add("dragging");
-      event.dataTransfer.setData("text/plain", translation);
-      event.dataTransfer.effectAllowed = "move";
-    });
-    item.addEventListener("dragend", () => item.classList.remove("dragging"));
-    item.addEventListener("dragover", (event) => event.preventDefault());
-    item.addEventListener("drop", (event) => {
-      event.preventDefault();
-      const dragged = event.dataTransfer.getData("text/plain");
-      const from = copyTranslationOrder.indexOf(dragged);
-      const to = copyTranslationOrder.indexOf(translation);
-      if (from >= 0 && to >= 0 && from !== to) moveCopyTranslation(from, to);
-    });
-    const toggleCopyTranslation = () => {
-      const selected = !item.classList.contains("selected");
-      item.classList.toggle("selected", selected);
-      item.setAttribute("aria-checked", String(selected));
-    };
-    item.addEventListener("click", (event) => {
-      toggleCopyTranslation();
-    });
-    item.addEventListener("keydown", (event) => {
-      if (event.target !== item) return;
-      if (event.key !== "Enter" && event.key !== " ") return;
-      event.preventDefault();
-      toggleCopyTranslation();
-    });
-
-    item.append(handle, check, text);
-    copyTranslations.append(item);
-  });
-}
-
-function moveCopyTranslation(from, to) {
-  if (to < 0 || to >= copyTranslationOrder.length) return;
-  const checked = new Set(
-    [...copyTranslations.querySelectorAll(".copy-translation-option.selected")]
-      .map((item) => item.dataset.translation),
-  );
-  const [translation] = copyTranslationOrder.splice(from, 1);
-  copyTranslationOrder.splice(to, 0, translation);
-  renderCopyTranslationOptions(checked);
-}
-
 function formatVerseReference(chapter, verses) {
   if (!verses.length) return `${chapter}:`;
   const parts = [];
@@ -2481,11 +2595,12 @@ function openCopyDialog(panelState) {
   copyReference.textContent = `${book.en} ${book.ko} ${reference}`;
   // Offer only the translations currently shown, in their reading order.
   copyTranslationOrder = [...enabledTranslationIds()];
-  renderCopyTranslationOptions(new Set(copyTranslationOrder));
+  copyTranslationControl?.render();
   copyDialog.showModal();
 }
 
 function closeCopyDialog() {
+  copyTranslationControl?.close();
   copyDialog.close();
   copyPanelState = null;
 }
@@ -2541,8 +2656,7 @@ async function writeClipboard(text) {
 
 async function copySelectedVerses() {
   if (!copyPanelState) return;
-  const translations = [...copyTranslations.querySelectorAll(".copy-translation-option.selected")]
-    .map((item) => item.dataset.translation);
+  const translations = [...copyTranslationOrder];
   if (!translations.length) {
     copyStatus.textContent = "Select a version.";
     return;
@@ -2561,16 +2675,19 @@ async function copySelectedVerses() {
 }
 
 function openSearch() {
+  searchTranslationOrder = [...enabledTranslationIds()];
+  searchTranslationControl?.render();
   searchDialog.showModal();
   requestAnimationFrame(() => searchInput.focus());
 }
 
 function closeSearch() {
+  searchTranslationControl?.close();
   searchDialog.close();
 }
 
 function runSearch(query) {
-  const translations = enabledTranslationIds();
+  const translations = [...searchTranslationOrder];
   searchBookList.replaceChildren();
   searchResults.replaceChildren();
   if (!translations.length) {
@@ -2664,7 +2781,7 @@ function renderSearchResults(query, matches, bookCounts, totalTranslationMatches
     reference.append(referenceText);
     content.append(reference);
 
-    const translationOrder = enabledTranslationIds();
+    const translationOrder = searchTranslationOrder;
     result.lines.sort(
       (a, b) => translationOrder.indexOf(a.translation) - translationOrder.indexOf(b.translation),
     );
@@ -2786,6 +2903,34 @@ async function init() {
     applyTouchPanelCount();
     applyFontSize();
     renderTranslationControls();
+    copyTranslationControl = setupDialogTranslationControl({
+      picker: copyTranslationPicker,
+      toggle: copyTranslationPickerToggle,
+      menu: copyTranslationPickerMenu,
+      list: copyTranslations,
+      getOrder: () => copyTranslationOrder,
+      setOrder: (order) => {
+        copyTranslationOrder = order;
+      },
+      onChange: () => {
+        copyStatus.textContent = "";
+      },
+    });
+    searchTranslationOrder = [...enabledTranslationIds()];
+    searchTranslationControl = setupDialogTranslationControl({
+      picker: searchTranslationPicker,
+      toggle: searchTranslationPickerToggle,
+      menu: searchTranslationPickerMenu,
+      list: searchTranslationList,
+      getOrder: () => searchTranslationOrder,
+      setOrder: (order) => {
+        searchTranslationOrder = order;
+      },
+      onChange: () => {
+        const query = searchInput.value.trim();
+        if (searchDialog.open && query) runSearch(query);
+      },
+    });
     for (const panel of state.panels) createPanelElement(panel);
     if (desktopLikePanels()) applyDesktopPanelWidths();
     saveState();

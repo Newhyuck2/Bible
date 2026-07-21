@@ -8,7 +8,7 @@
     />
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta name="description" content="A compact multi-panel Bible reader" />
-    <meta name="asset-version" content="20260720-17" />
+    <meta name="asset-version" content="20260721-1" />
     <meta name="theme-color" content="#284f43" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -141,13 +141,38 @@
         </div>
 
         <form class="search-form" id="search-form">
+          <div class="translation-controls dialog-translation-controls" id="search-translation-controls">
+            <div class="translation-picker" id="search-translation-picker">
+              <button
+                class="translation-picker-toggle"
+                id="search-translation-picker-toggle"
+                type="button"
+                aria-haspopup="listbox"
+                aria-expanded="false"
+                aria-label="Add search version"
+                title="Add version"
+              >
+                <svg class="picker-plus" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 5v14M5 12h14"></path>
+                </svg>
+              </button>
+              <div
+                class="translation-picker-menu"
+                id="search-translation-picker-menu"
+                hidden
+                role="listbox"
+                aria-label="Available search versions"
+              ></div>
+            </div>
+            <div class="translation-list" id="search-translation-list" aria-label="Search versions"></div>
+          </div>
           <label class="search-input-wrap" for="search-input">
             <span aria-hidden="true"></span>
             <input
               id="search-input"
               name="query"
               type="search"
-              minlength="2"
+              minlength="1"
               autocomplete="off"
               required
             />
@@ -160,7 +185,7 @@
           </button>
         </form>
 
-        <div class="search-meta" id="search-meta">Enter at least two characters.</div>
+        <div class="search-meta" id="search-meta">Enter at least one character.</div>
         <div class="search-body">
           <nav class="search-book-list" id="search-book-list" aria-label="Books in search results"></nav>
           <div class="search-results" id="search-results"></div>
@@ -179,7 +204,31 @@
 
         <fieldset>
           <legend>Versions</legend>
-          <div class="copy-translation-options" id="copy-translations"></div>
+          <div class="translation-controls dialog-translation-controls" id="copy-translation-controls">
+            <div class="translation-picker" id="copy-translation-picker">
+              <button
+                class="translation-picker-toggle"
+                id="copy-translation-picker-toggle"
+                type="button"
+                aria-haspopup="listbox"
+                aria-expanded="false"
+                aria-label="Add copy version"
+                title="Add version"
+              >
+                <svg class="picker-plus" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 5v14M5 12h14"></path>
+                </svg>
+              </button>
+              <div
+                class="translation-picker-menu"
+                id="copy-translation-picker-menu"
+                hidden
+                role="listbox"
+                aria-label="Available copy versions"
+              ></div>
+            </div>
+            <div class="translation-list copy-translation-options" id="copy-translations" aria-label="Copy versions"></div>
+          </div>
         </fieldset>
 
         <fieldset>

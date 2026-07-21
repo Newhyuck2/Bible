@@ -472,7 +472,7 @@ input:focus {
   width: 28px;
   height: 28px;
   place-items: center;
-  border-radius: 9px;
+  border-radius: 0;
   background: var(--accent-soft);
   color: var(--accent);
   font-family: Georgia, serif;
@@ -1205,7 +1205,7 @@ mark {
   margin-inline: -6px;
   padding-right: 6px;
   padding-left: 44px;
-  border-radius: 7px;
+  border-radius: 0;
   cursor: pointer;
   transition: background-color 120ms ease;
 }
@@ -1683,7 +1683,7 @@ mark {
   top: 10px;
   width: 26px;
   height: 26px;
-  border-radius: 8px;
+  border-radius: 0;
   font-size: 12px;
 }
 
@@ -3052,7 +3052,7 @@ body * {
   width: 18px;
   height: 5px;
   border: 1px solid #817c73;
-  border-radius: 2px;
+  border-radius: 0;
   background: linear-gradient(#918b82, #757068);
 }
 
@@ -3969,5 +3969,75 @@ html[data-verse-layout="columns"] .translation-label {
   .compact-toolbar .translation-chip {
     height: 32px;
     min-height: 32px;
+  }
+}
+
+.dialog-translation-controls {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--toolbar-icon-gap);
+}
+
+.dialog-translation-controls .translation-list {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-block: 1px;
+}
+
+.search-form .dialog-translation-controls {
+  grid-column: 1 / -1;
+}
+
+.copy-dialog .dialog-translation-controls {
+  width: 100%;
+}
+
+.copy-dialog .copy-translation-options {
+  display: flex;
+  grid-template-columns: none;
+  flex-wrap: nowrap;
+  align-items: center;
+  overflow-x: auto;
+}
+
+.copy-dialog .translation-chip.drag-over,
+.search-dialog .translation-chip.drag-over {
+  outline-offset: 1px;
+}
+
+.verse-group {
+  padding-top: 5px;
+  padding-bottom: 6px;
+  border-radius: 0;
+}
+
+.verse-number {
+  top: 6px;
+  border-radius: 0;
+}
+
+.selection-bars span {
+  border-radius: 0;
+}
+
+@media (max-width: 820px), (max-width: 1366px) and (any-pointer: coarse) {
+  .bible-panel.touch-chrome-hidden .panel-header {
+    max-height: 0;
+    overflow: hidden;
+    padding-top: 0;
+    padding-bottom: 0;
+    border-bottom: 0;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .bible-panel.touch-chrome-hidden .panel-move {
+    opacity: 0 !important;
+    pointer-events: none;
+  }
+
+  .bible-panel.touch-chrome-hidden .panel-content {
+    padding-top: 6px;
   }
 }
