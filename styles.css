@@ -3979,14 +3979,36 @@ html[data-verse-layout="columns"] .translation-label {
   gap: var(--toolbar-icon-gap);
 }
 
+.dialog-translation-controls .translation-picker {
+  display: flex;
+  height: 34px;
+  align-items: center;
+}
+
 .dialog-translation-controls .translation-list {
   flex: 1 1 auto;
+  height: 34px;
   min-width: 0;
+  align-items: center;
   padding-block: 1px;
+}
+
+.dialog-translation-controls .translation-picker-toggle,
+.dialog-translation-controls .translation-chip {
+  height: 32px;
+  min-height: 32px;
+}
+
+.dialog-translation-controls .translation-picker-menu {
+  z-index: 80;
 }
 
 .search-form .dialog-translation-controls {
   grid-column: 1 / -1;
+}
+
+.search-meta:empty {
+  display: none;
 }
 
 .copy-dialog .dialog-translation-controls {
@@ -4022,6 +4044,21 @@ html[data-verse-layout="columns"] .translation-label {
 }
 
 @media (max-width: 820px), (max-width: 1366px) and (any-pointer: coarse) {
+  .bible-panel .panel-header {
+    max-height: 92px;
+    transition:
+      max-height 180ms ease,
+      padding 180ms ease,
+      opacity 180ms ease,
+      border-color 180ms ease;
+  }
+
+  .bible-panel .chapter-jump {
+    transition:
+      opacity 180ms ease,
+      transform 180ms ease;
+  }
+
   .bible-panel.touch-chrome-hidden .panel-header {
     max-height: 0;
     overflow: hidden;
@@ -4029,6 +4066,12 @@ html[data-verse-layout="columns"] .translation-label {
     padding-bottom: 0;
     border-bottom: 0;
     opacity: 0;
+    pointer-events: none;
+  }
+
+  .bible-panel.touch-chrome-hidden .chapter-jump {
+    opacity: 0;
+    transform: translateY(8px);
     pointer-events: none;
   }
 

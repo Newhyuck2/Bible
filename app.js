@@ -422,7 +422,7 @@ function resetSite() {
   saveState();
 
   searchInput.value = "";
-  searchMeta.textContent = "Enter at least one character.";
+  searchMeta.textContent = "";
   searchBookList.replaceChildren();
   searchResults.replaceChildren();
   searchRequestId += 1;
@@ -905,12 +905,30 @@ function renderDialogTranslationPickerMenu({ menu, picker, getOrder, onToggle })
 
 function positionTranslationPickerMenuFor(picker, menu) {
   if (menu.hidden) return;
-  menu.style.right = "auto";
-  menu.style.left = "0";
+  const inDialog = Boolean(picker.closest("dialog"));
   const width = menu.getBoundingClientRect().width;
   const anchor = picker.getBoundingClientRect();
   const left = Math.max(8, Math.min(anchor.left, window.innerWidth - width - 8));
+  if (inDialog) {
+    const gap = 6;
+    const below = window.innerHeight - anchor.bottom - gap - 8;
+    const above = anchor.top - gap - 8;
+    const openAbove = below < 220 && above > below;
+    const maxHeight = Math.max(160, Math.min(480, openAbove ? above : below));
+    menu.style.position = "fixed";
+    menu.style.right = "auto";
+    menu.style.left = `${left}px`;
+    menu.style.top = openAbove ? "auto" : `${anchor.bottom + gap}px`;
+    menu.style.bottom = openAbove ? `${window.innerHeight - anchor.top + gap}px` : "auto";
+    menu.style.maxHeight = `${maxHeight}px`;
+    return;
+  }
+  menu.style.position = "";
+  menu.style.right = "auto";
   menu.style.left = `${left - anchor.left}px`;
+  menu.style.top = "";
+  menu.style.bottom = "";
+  menu.style.maxHeight = "";
 }
 
 function setupDialogTranslationControl({ picker, toggle, menu, list, getOrder, setOrder, onChange }) {
@@ -1589,7 +1607,11 @@ function setPanelChromeHidden(panelOrState, hidden) {
     ? panelOrState
     : panelElements.get(panelOrState?.id)?.panel;
   if (!panel) return;
-  panel.classList.toggle("touch-chrome-hidden", Boolean(hidden && mobileLayout.matches));
+  const content = panel.querySelector(".panel-content");
+  const canHide = mobileLayout.matches
+    && !panel.classList.contains("selection-active")
+    && (!content || content.scrollTop > 1);
+  panel.classList.toggle("touch-chrome-hidden", Boolean(hidden && canHide));
 }
 
 // Horizontal touch drags on a panel pan the track by hand, following the
@@ -1871,6 +1893,9 @@ function createPanelElement(panelState, shouldScroll = false) {
   }
   panel.addEventListener("pointerdown", () => setActivePanel(id));
   panel.addEventListener("focusin", () => setActivePanel(id));
+  content.addEventListener("scroll", () => {
+    if (content.scrollTop <= 1) setPanelChromeHidden(panel, false);
+  }, { passive: true });
 
   const bookItems = manifest.books.map((book, index) => ({
     value: index,
@@ -2257,6 +2282,7 @@ function updatePanelSelection(panelState) {
     group.classList.toggle("selected", selected.has(verse));
   });
   elements.panel.classList.toggle("selection-active", hasSelection);
+  if (hasSelection) setPanelChromeHidden(elements.panel, false);
   elements.copy.hidden = !hasSelection;
   elements.selectionModeControl.hidden = !hasSelection;
   elements.cancelSelection.hidden = !hasSelection;
@@ -2972,7 +2998,7 @@ copyDialog.addEventListener("click", (event) => {
 searchForm.addEventListener("submit", (event) => {
   event.preventDefault();
   const query = searchInput.value.trim();
-  if (query.length < 2) return;
+  if (query.length < 1) return;
   runSearch(query);
 });
 portraitLayout.addEventListener("change", schedulePanelLayoutAlignment);
