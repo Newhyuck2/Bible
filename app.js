@@ -1679,30 +1679,24 @@ function setupPanelSwipe(panel) {
   );
   // A touch that lands while the content is still coasting from momentum
   // scrolling is meant to arrest that motion, not to ask for the chrome
-  // back — let it stop the scroll natively instead of also revealing.
+  // back — suppress the reveal-on-tap click that would otherwise follow.
   const CHROME_REVEAL_SCROLL_SETTLE_MS = 150;
   const isContentCoasting = (content) => (
     Boolean(content) && performance.now() - (content._lastScrollAt ?? 0) < CHROME_REVEAL_SCROLL_SETTLE_MS
   );
-  const revealHiddenChromeFromPress = (event) => {
-    if (!mobileLayout.matches || !panel.classList.contains("touch-chrome-hidden")) return false;
-    if (shouldIgnoreSwipeStart(event.target)) return false;
-    if (isContentCoasting(panel.querySelector(".panel-content"))) {
-      suppressClick = true;
-      window.setTimeout(() => {
-        suppressClick = false;
-      }, 350);
-      return false;
-    }
-    cancelPanelGlide();
-    revealPanelChrome(panel, true);
-    event.preventDefault();
-    event.stopImmediatePropagation();
+  // Chrome-reveal-on-tap is decided at touchend/click, never at touchstart:
+  // deciding immediately would mean preventDefault-ing every touch that
+  // lands on hidden chrome, which cancels native scrolling for the whole
+  // gesture and makes it impossible to start a fresh drag from a stopped,
+  // chrome-hidden panel.
+  const suppressRevealIfCoasting = (event) => {
+    if (!mobileLayout.matches || !panel.classList.contains("touch-chrome-hidden")) return;
+    if (shouldIgnoreSwipeStart(event.target)) return;
+    if (!isContentCoasting(panel.querySelector(".panel-content"))) return;
     suppressClick = true;
     window.setTimeout(() => {
       suppressClick = false;
     }, 350);
-    return true;
   };
 
   panel.addEventListener("click", (event) => {
@@ -1719,10 +1713,7 @@ function setupPanelSwipe(panel) {
   }, true);
 
   panel.addEventListener("touchstart", (event) => {
-    if (revealHiddenChromeFromPress(event)) {
-      gesture = null;
-      return;
-    }
+    suppressRevealIfCoasting(event);
     cancelPanelGlide();
     if (event.touches.length !== 1) {
       gesture = null;
@@ -1741,7 +1732,7 @@ function setupPanelSwipe(panel) {
       axis: null,
       samples: [{ time: performance.now(), x: touch.clientX }],
     };
-  }, { passive: false });
+  }, { passive: true });
 
   panel.addEventListener("touchmove", (event) => {
     if (!gesture) return;
