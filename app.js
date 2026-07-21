@@ -1625,15 +1625,27 @@ function setPanelChromeHidden(panelOrState, hidden) {
   panel.classList.toggle("touch-chrome-hidden", Boolean(hidden && canHide));
 }
 
+// The panel header/chapter-jump reveal animates over 180ms (see the
+// touch-chrome-hidden transition in styles.css), which continuously resizes
+// the content row as it plays. Correcting the scroll anchor at only a few
+// fixed checkpoints let the verses drift between corrections and snap back,
+// reading as a vertical wobble. Re-anchoring every animation frame for the
+// full transition keeps the verses visually still while only the chrome
+// grows in above them.
+const CHROME_REVEAL_TRACK_MS = 220;
+
 function revealPanelChrome(panel, preserveContent = false) {
   if (!panel?.classList.contains("touch-chrome-hidden")) return;
   const content = panel.querySelector(".panel-content");
   const anchor = preserveContent ? captureContentAnchor(content) : null;
   setPanelChromeHidden(panel, false);
-  restoreContentAnchor(content, anchor);
-  requestAnimationFrame(() => restoreContentAnchor(content, anchor));
-  window.setTimeout(() => restoreContentAnchor(content, anchor), 90);
-  window.setTimeout(() => restoreContentAnchor(content, anchor), 190);
+  if (!anchor) return;
+  const start = performance.now();
+  const track = (now) => {
+    restoreContentAnchor(content, anchor);
+    if (now - start < CHROME_REVEAL_TRACK_MS) requestAnimationFrame(track);
+  };
+  requestAnimationFrame(track);
 }
 
 function captureContentAnchor(content) {

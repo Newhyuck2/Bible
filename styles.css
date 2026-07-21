@@ -3997,6 +3997,7 @@ html[data-verse-layout="columns"] .translation-label {
   align-self: start;
   overflow-y: visible;
   gap: 5px;
+  margin-top: 0;
   padding-block: 0;
   line-height: 0;
 }
