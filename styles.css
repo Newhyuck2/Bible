@@ -2188,7 +2188,7 @@ body * {
   }
 
   .app-header {
-    height: calc(86px + env(safe-area-inset-top));
+    height: calc(46px + env(safe-area-inset-top));
     padding: max(6px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-right)) 5px
       max(6px, env(safe-area-inset-left));
   }
@@ -2198,10 +2198,8 @@ body * {
     width: 100%;
     height: 100%;
     grid-template-columns: auto minmax(0, 1fr) auto auto auto;
-    grid-template-rows: 34px 35px;
-    grid-template-areas:
-      "brand verse view font actions"
-      "translations translations translations translations translations";
+    grid-template-rows: 34px;
+    grid-template-areas: "brand . view font actions";
     align-items: center;
     gap: var(--toolbar-icon-gap);
   }
@@ -2226,34 +2224,13 @@ body * {
     height: 28px;
   }
 
-  .compact-toolbar .translation-controls {
-    grid-area: translations;
-    display: flex;
-    width: 100%;
-    min-width: 0;
-    align-items: center;
-    gap: var(--toolbar-icon-gap);
-  }
-
-  .compact-toolbar .translation-list {
-    flex: 1 1 auto;
-    min-width: 0;
-    margin: 0;
-    padding: 1px 0 2px;
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
-    scrollbar-width: none;
-    touch-action: pan-x;
-  }
-
-  .compact-toolbar .translation-list::-webkit-scrollbar,
-  .panel-track::-webkit-scrollbar {
-    display: none;
-  }
-
   .translation-chip {
     min-height: 32px;
     scroll-snap-align: start;
+  }
+
+  .panel-track::-webkit-scrollbar {
+    display: none;
   }
 
   .font-size-control {
@@ -2281,8 +2258,8 @@ body * {
   }
 
   .workspace {
-    height: calc(100vh - 86px - env(safe-area-inset-top));
-    height: calc(100dvh - 86px - env(safe-area-inset-top));
+    height: calc(100vh - 46px - env(safe-area-inset-top));
+    height: calc(100dvh - 46px - env(safe-area-inset-top));
     padding: 5px 0 max(6px, env(safe-area-inset-bottom));
   }
 
@@ -3222,20 +3199,12 @@ body * {
     display: flex;
     justify-self: end;
   }
-
-  .verse-layout-control {
-    grid-area: verse;
-    display: flex;
-    justify-self: end;
-  }
 }
 
 @media (orientation: portrait) and (max-width: 599px) {
   .compact-toolbar {
     grid-template-columns: auto minmax(0, 1fr) auto auto;
-    grid-template-areas:
-      "brand verse font actions"
-      "translations translations translations translations";
+    grid-template-areas: "brand . font actions";
   }
 
   .site-brand > span:last-child {
@@ -3259,13 +3228,8 @@ body * {
   .compact-toolbar {
     grid-template-columns: auto minmax(0, 1fr) auto auto auto auto;
     grid-template-rows: 34px;
-    grid-template-areas: "brand translations verse view font actions";
+    grid-template-areas: "brand . . view font actions";
     gap: var(--toolbar-icon-gap);
-  }
-
-  .compact-toolbar .translation-controls {
-    width: auto;
-    min-width: 0;
   }
 
   .panel-count-control {
@@ -3280,11 +3244,6 @@ body * {
     background: white;
   }
 
-  .verse-layout-control {
-    grid-area: verse;
-    display: flex;
-  }
-
   .workspace {
     height: calc(100vh - 46px - env(safe-area-inset-top));
     height: calc(100dvh - 46px - env(safe-area-inset-top));
@@ -3296,7 +3255,7 @@ body * {
   display: none;
 }
 
-html[data-verse-layout="columns"] .column-translation-header {
+.bible-panel[data-verse-layout="columns"] .column-translation-header {
   position: sticky;
   top: 0;
   z-index: 7;
@@ -3323,7 +3282,7 @@ html[data-verse-layout="columns"] .column-translation-header {
   letter-spacing: 0.03em;
 }
 
-html[data-verse-layout="columns"] .verse-group {
+.bible-panel[data-verse-layout="columns"] .verse-group {
   display: grid;
   grid-template-columns: repeat(var(--translation-count), minmax(0, 1fr));
   align-items: start;
@@ -3331,22 +3290,22 @@ html[data-verse-layout="columns"] .verse-group {
   padding-left: 32px;
 }
 
-html[data-verse-layout="columns"] .translation-line {
+.bible-panel[data-verse-layout="columns"] .translation-line {
   display: block;
   min-width: 0;
 }
 
-html[data-verse-layout="columns"] .translation-line + .translation-line {
+.bible-panel[data-verse-layout="columns"] .translation-line + .translation-line {
   margin-top: 0;
 }
 
-html[data-verse-layout="columns"] .translation-label {
+.bible-panel[data-verse-layout="columns"] .translation-label {
   display: none;
 }
 
 @media (max-width: 820px), (max-width: 1366px) and (any-pointer: coarse) {
-  html[data-verse-layout="columns"] .column-translation-header,
-  html[data-verse-layout="columns"] .verse-group {
+  .bible-panel[data-verse-layout="columns"] .column-translation-header,
+  .bible-panel[data-verse-layout="columns"] .verse-group {
     gap: 8px;
   }
 }
@@ -3975,7 +3934,8 @@ html[data-verse-layout="columns"] .translation-label {
 .dialog-translation-controls {
   display: grid;
   grid-template-columns: 32px minmax(0, 1fr);
-  height: 32px;
+  height: auto;
+  min-height: 32px;
   min-width: 0;
   align-items: start;
   gap: var(--toolbar-icon-gap);
@@ -3991,7 +3951,8 @@ html[data-verse-layout="columns"] .translation-label {
 .dialog-translation-controls .translation-list {
   display: flex;
   flex: 1 1 auto;
-  height: 32px;
+  height: auto;
+  min-height: 32px;
   min-width: 0;
   align-items: flex-start;
   align-self: start;
@@ -4002,12 +3963,20 @@ html[data-verse-layout="columns"] .translation-label {
   line-height: 0;
 }
 
+/* A horizontal scrollbar eats into this row's own box from the bottom edge;
+   without slack below the 32px chips, it clips their bottom rather than
+   sitting under them. Reserve that slack only once chips actually overflow
+   (toggled in app.js), so the row stays compact the rest of the time. */
+.dialog-translation-controls .translation-list.translation-list--overflowing {
+  padding-bottom: 18px;
+}
+
 .dialog-translation-controls .translation-picker-toggle,
 .dialog-translation-controls .translation-chip {
   height: 32px;
   min-height: 32px;
   max-height: 32px;
-  align-self: center;
+  align-self: flex-start;
 }
 
 .dialog-translation-controls .translation-chip {
@@ -4052,6 +4021,23 @@ html[data-verse-layout="columns"] .translation-label {
   outline-offset: 1px;
 }
 
+/* Each panel gets its own add-version / chip row / layout-toggle line above
+   the book-chapter-verse selectors, so translations and stacked/columns mode
+   can differ panel to panel instead of applying to the whole page. */
+.panel-translation-controls {
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  margin-bottom: 8px;
+}
+
+.panel-translation-controls .verse-layout-control {
+  flex: 0 0 auto;
+  /* .translation-picker/.translation-list carry order: 0/1 from their
+     original flex header context; order affects grid auto-placement too,
+     so without this the unordered (order: 0) toggle would tie with the
+     picker and sort ahead of the order: 1 chip list. */
+  order: 2;
+}
+
 .verse-group {
   padding-top: 3px;
   padding-bottom: 4px;
@@ -4075,7 +4061,12 @@ html[data-verse-layout="columns"] .translation-label {
   }
 
   .bible-panel .panel-header {
-    max-height: 92px;
+    /* Generous ceiling, not a fixed size: the header now carries two rows
+       (translation controls + book/chapter/verse selectors), and the
+       translation row itself can grow taller when its chip list needs a
+       scrollbar. max-height only needs to exceed the tallest realistic case
+       so the reveal transition never clips it. */
+    max-height: 220px;
     transition:
       max-height 180ms ease,
       padding 180ms ease,
@@ -4118,12 +4109,12 @@ html[data-verse-layout="columns"] .translation-label {
     padding-top: 0;
   }
 
-  html[data-verse-layout="columns"] .column-translation-header {
+  .bible-panel[data-verse-layout="columns"] .column-translation-header {
     margin: 0 -10px;
     padding: 7px 10px 7px 40px;
   }
 
-  html[data-verse-layout="columns"] .bible-panel.touch-chrome-hidden .column-translation-header {
+  .bible-panel[data-verse-layout="columns"].touch-chrome-hidden .column-translation-header {
     top: 0;
     margin-top: 0;
     padding-top: 6px;

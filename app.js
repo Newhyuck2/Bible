@@ -17,6 +17,7 @@ const TRANSLATION_GROUPS = [
   { label: "Chinese", ids: ["CNV"] },
 ];
 const TRANSLATION_CANONICAL_ORDER = TRANSLATION_GROUPS.flatMap((group) => group.ids);
+const DEFAULT_ENABLED_TRANSLATIONS = ["NIV", "GAE"];
 const ASSET_VERSION = document.querySelector('meta[name="asset-version"]').content;
 const MOBILE_LAYOUT_QUERY = "(max-width: 820px), (max-width: 1366px) and (any-pointer: coarse)";
 const mobileLayout = window.matchMedia(MOBILE_LAYOUT_QUERY);
@@ -33,10 +34,6 @@ const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
 const panelTrack = document.querySelector("#panel-track");
 const panelTemplate = document.querySelector("#panel-template");
-const translationList = document.querySelector("#translation-list");
-const translationPicker = document.querySelector("#translation-picker");
-const translationPickerToggle = document.querySelector("#translation-picker-toggle");
-const translationPickerMenu = document.querySelector("#translation-picker-menu");
 const addPanelButton = document.querySelector("#add-panel");
 const searchDialog = document.querySelector("#search-dialog");
 const openSearchButton = document.querySelector("#open-search");
@@ -55,8 +52,6 @@ const fontSizeUpButton = document.querySelector("#font-size-up");
 const fontSizeValue = document.querySelector("#font-size-value");
 const panelCountOneButton = document.querySelector("#panel-count-one");
 const panelCountTwoButton = document.querySelector("#panel-count-two");
-const verseLayoutStackedButton = document.querySelector("#verse-layout-stacked");
-const verseLayoutColumnsButton = document.querySelector("#verse-layout-columns");
 const copyDialog = document.querySelector("#copy-dialog");
 const closeCopyButton = document.querySelector("#close-copy");
 const cancelCopyButton = document.querySelector("#cancel-copy");
@@ -91,13 +86,19 @@ const searchWorker = new Worker(`./search-worker.js?v=${ASSET_VERSION}`);
 
 function freshState() {
   return {
-    enabledTranslations: ["NIV", "GAE"],
     fontSize: 16,
     touchPanelCount: null,
     desktopPanelMode: null,
-    verseLayout: "stacked",
     copySelectionMode: "range",
-    panels: [{ book: 0, chapter: 1, verse: 1, history: [{ book: 0, chapter: 1, verse: 1 }], historyIndex: 0 }],
+    panels: [{
+      book: 0,
+      chapter: 1,
+      verse: 1,
+      enabledTranslations: [...DEFAULT_ENABLED_TRANSLATIONS],
+      verseLayout: "stacked",
+      history: [{ book: 0, chapter: 1, verse: 1 }],
+      historyIndex: 0,
+    }],
   };
 }
 
@@ -113,17 +114,27 @@ function loadState() {
 
 function sanitizeState() {
   const validTranslations = new Set(manifest.translations.map((item) => item.id));
-  const enabled = (Array.isArray(state.enabledTranslations) ? state.enabledTranslations : [])
-    .filter((id) => validTranslations.has(id));
-  if (Array.isArray(state.translationOrder)) {
-    // Migrate saves from when a separate translationOrder drove the chip row.
-    const position = new Map(state.translationOrder.map((id, index) => [id, index]));
-    enabled.sort((a, b) => (position.get(a) ?? 0) - (position.get(b) ?? 0));
-    delete state.translationOrder;
+
+  // Translations and verse layout used to be single global settings shared
+  // by every panel; saves from before the per-panel switch carry them at
+  // the top level here. Treat those as each panel's starting point, then
+  // drop the globals so the per-panel fields are the only source of truth.
+  let legacyEnabled = null;
+  if (Array.isArray(state.enabledTranslations)) {
+    legacyEnabled = state.enabledTranslations.filter((id) => validTranslations.has(id));
+    if (Array.isArray(state.translationOrder)) {
+      // Migrate saves from when a separate translationOrder drove the chip row.
+      const position = new Map(state.translationOrder.map((id, index) => [id, index]));
+      legacyEnabled.sort((a, b) => (position.get(a) ?? 0) - (position.get(b) ?? 0));
+    }
+    legacyEnabled = [...new Set(legacyEnabled)];
   }
-  state.enabledTranslations = [...new Set(enabled)];
+  delete state.enabledTranslations;
+  delete state.translationOrder;
+  const legacyVerseLayout = state.verseLayout === "columns" ? "columns" : null;
+  delete state.verseLayout;
+
   state.fontSize = Math.max(10, Math.min(Number(state.fontSize) || 16, 22));
-  state.verseLayout = state.verseLayout === "columns" ? "columns" : "stacked";
   state.copySelectionMode = state.copySelectionMode === "individual" ? "individual" : "range";
   const savedPanelCount = Number(state.touchPanelCount);
   state.touchPanelCount = phonePortraitLayout.matches
@@ -154,6 +165,13 @@ function sanitizeState() {
         : [];
       if (!history.length) history.push({ book, chapter, verse });
       const historyIndex = Math.max(0, Math.min(Number(panel.historyIndex) || 0, history.length - 1));
+      const enabledTranslations = [...new Set(
+        (Array.isArray(panel.enabledTranslations) ? panel.enabledTranslations : legacyEnabled ?? DEFAULT_ENABLED_TRANSLATIONS)
+          .filter((id) => validTranslations.has(id)),
+      )];
+      const verseLayout = panel.verseLayout === "columns" || panel.verseLayout === "stacked"
+        ? panel.verseLayout
+        : legacyVerseLayout ?? "stacked";
       return {
         book,
         chapter,
@@ -161,6 +179,8 @@ function sanitizeState() {
         history,
         historyIndex,
         width: Number.isFinite(width) ? Math.max(1, Math.min(width, 5000)) : null,
+        enabledTranslations,
+        verseLayout,
       };
     })
     .slice(0, 12);
@@ -171,19 +191,19 @@ function saveState() {
   localStorage.setItem(
     STORAGE_KEY,
     JSON.stringify({
-      enabledTranslations: state.enabledTranslations,
       fontSize: state.fontSize,
       touchPanelCount: state.touchPanelCount,
       desktopPanelMode: state.desktopPanelMode,
-      verseLayout: state.verseLayout,
       copySelectionMode: state.copySelectionMode,
-      panels: state.panels.map(({ book, chapter, verse, history, historyIndex, width }) => ({
+      panels: state.panels.map(({ book, chapter, verse, history, historyIndex, width, enabledTranslations, verseLayout }) => ({
         book,
         chapter,
         verse,
         history,
         historyIndex,
         width,
+        enabledTranslations,
+        verseLayout,
       })),
     }),
   );
@@ -210,35 +230,37 @@ function isTwoPanelTouchMode() {
   return Boolean(state && touchPanelToggleLayout.matches && state.desktopPanelMode === 2);
 }
 
-function enabledTranslationIds() {
-  return state ? state.enabledTranslations : [];
+function enabledTranslationIds(panelState) {
+  return panelState ? panelState.enabledTranslations : [];
 }
 
-function effectiveVerseLayout() {
-  return state?.verseLayout === "columns" ? "columns" : "stacked";
+function effectiveVerseLayout(panelState) {
+  return panelState?.verseLayout === "columns" ? "columns" : "stacked";
 }
 
-function updateVerseLayoutControls() {
-  if (!state) return;
-  const effectiveLayout = effectiveVerseLayout();
-  verseLayoutStackedButton.classList.toggle("selected", effectiveLayout === "stacked");
-  verseLayoutColumnsButton.classList.toggle("selected", effectiveLayout === "columns");
-  verseLayoutStackedButton.setAttribute("aria-pressed", String(effectiveLayout === "stacked"));
-  verseLayoutColumnsButton.setAttribute("aria-pressed", String(effectiveLayout === "columns"));
+function updatePanelVerseLayoutControls(panelState) {
+  const elements = panelElements.get(panelState.id);
+  if (!elements) return;
+  const effectiveLayout = effectiveVerseLayout(panelState);
+  elements.verseLayoutStacked.classList.toggle("selected", effectiveLayout === "stacked");
+  elements.verseLayoutColumns.classList.toggle("selected", effectiveLayout === "columns");
+  elements.verseLayoutStacked.setAttribute("aria-pressed", String(effectiveLayout === "stacked"));
+  elements.verseLayoutColumns.setAttribute("aria-pressed", String(effectiveLayout === "columns"));
 }
 
-function applyVerseLayout(refresh = true) {
-  if (!state) return;
-  document.documentElement.dataset.verseLayout = effectiveVerseLayout();
-  updateVerseLayoutControls();
-  if (refresh && panelElements.size) refreshPanelBodies();
+function applyPanelVerseLayout(panelState) {
+  const elements = panelElements.get(panelState.id);
+  if (!elements) return;
+  elements.panel.dataset.verseLayout = effectiveVerseLayout(panelState);
+  updatePanelVerseLayoutControls(panelState);
+  renderPanelBody(panelState);
 }
 
-function setVerseLayout(layout) {
+function setPanelVerseLayout(panelState, layout) {
   if (layout !== "stacked" && layout !== "columns") return;
-  state.verseLayout = layout;
+  panelState.verseLayout = layout;
   saveState();
-  applyVerseLayout();
+  applyPanelVerseLayout(panelState);
 }
 
 function updatePanelCountControls() {
@@ -363,7 +385,7 @@ function applyTouchPanelCount(alignmentIndex = -1) {
   forcePhonePortraitOnePanel();
   document.documentElement.dataset.touchPanelCount = String(state.touchPanelCount);
   updatePanelCountControls();
-  applyVerseLayout();
+  if (panelElements.size) refreshPanelBodies();
   alignPanelsAfterLayoutChange(alignmentIndex);
 }
 
@@ -401,10 +423,12 @@ function schedulePanelLayoutAlignment() {
 function resetSite() {
   if (searchDialog.open) closeSearch();
   if (copyDialog.open) closeCopyDialog();
-  closeTranslationPicker();
   localStorage.removeItem(STORAGE_KEY);
 
-  for (const { panel } of panelElements.values()) panel.remove();
+  for (const { panel, translationControl } of panelElements.values()) {
+    translationControl.destroy();
+    panel.remove();
+  }
   panelElements.clear();
   state = freshState();
   sanitizeState();
@@ -417,7 +441,6 @@ function resetSite() {
   applyTouchPanelCount();
   activePanelId = undefined;
   applyFontSize();
-  renderTranslationControls();
   for (const panel of state.panels) createPanelElement(panel);
   if (desktopLikePanels()) applyDesktopPanelWidths();
   saveState();
@@ -451,11 +474,6 @@ function translationLanguage(id) {
 function canonicalTranslationRank(id) {
   const rank = TRANSLATION_CANONICAL_ORDER.indexOf(id);
   return rank >= 0 ? rank : TRANSLATION_CANONICAL_ORDER.length;
-}
-
-function renderTranslationControls() {
-  renderTranslationChips();
-  if (!translationPickerMenu.hidden) renderTranslationPickerMenu();
 }
 
 function insertTranslationInOrder(order, id) {
@@ -539,148 +557,14 @@ function renderTranslationChipList({ list, order, onRemove, onMove }) {
     chip.append(handle, name, removeButton);
     list.append(chip);
   }
-}
 
-// The chip row shows only the translations currently in use. New picks slot
-// near canonical order, while the handle lets touch users customize the row.
-function renderTranslationChips() {
-  renderTranslationChipList({
-    list: translationList,
-    order: enabledTranslationIds(),
-    onRemove: removeTranslation,
-    onMove: moveTranslation,
+  // Deferred a frame so a dialog opening in this same tick (showModal right
+  // after render) has already become visible — scrollWidth/clientWidth read
+  // 0/0 on a still-hidden <dialog>, which would misjudge overflow.
+  requestAnimationFrame(() => {
+    list.classList.toggle("translation-list--overflowing", list.scrollWidth > list.clientWidth + 1);
   });
 }
-
-// A newly picked version slots into the canonical ESV→NIV→KJV→NASB→NRSV→
-// 개역개정→새번역→우리말→新译本 order (before the first chip that ranks
-// after it), rather than appending at the end.
-function addTranslation(id) {
-  if (!insertTranslationInOrder(state.enabledTranslations, id)) return;
-  saveState();
-  renderTranslationControls();
-  applyVerseLayout();
-}
-
-function removeTranslation(id) {
-  if (!state.enabledTranslations.includes(id)) return;
-  state.enabledTranslations = state.enabledTranslations.filter((item) => item !== id);
-  saveState();
-  renderTranslationControls();
-  applyVerseLayout();
-}
-
-function moveTranslation(from, to) {
-  if (!moveTranslationInOrder(state.enabledTranslations, from, to)) return;
-  saveState();
-  renderTranslationControls();
-  applyVerseLayout();
-}
-
-// ---- Translation picker ----
-// A grouped dropdown (English / Korean / Chinese) that adds a translation
-// per pick; picking one that is already shown removes it again.
-let pickerSuppressClickUntil = 0;
-// A touch press opens the picker on pointerdown (so a drag can run through
-// it); the click that same tap fires afterwards must not toggle it shut.
-let pickerOpenedByTouchPress = false;
-
-function renderTranslationPickerMenu() {
-  translationPickerMenu.replaceChildren();
-  if (!manifest) return;
-  for (const group of TRANSLATION_GROUPS) {
-    const ids = group.ids.filter((id) => translationMeta(id));
-    if (!ids.length) continue;
-    const section = document.createElement("div");
-    section.className = "translation-picker-group";
-    const heading = document.createElement("div");
-    heading.className = "translation-picker-group-label";
-    heading.textContent = group.label;
-    section.append(heading);
-    for (const id of ids) {
-      const meta = translationMeta(id);
-      const isEnabled = state.enabledTranslations.includes(id);
-      const option = document.createElement("button");
-      option.type = "button";
-      option.className = "translation-picker-option";
-      option.classList.toggle("selected", isEnabled);
-      option.dataset.translation = id;
-      option.setAttribute("role", "option");
-      option.setAttribute("aria-selected", String(isEnabled));
-
-      const label = document.createElement("span");
-      label.className = "picker-label";
-      label.lang = translationLanguage(id);
-      label.textContent = meta.label;
-      label.style.setProperty("--translation-color", TRANSLATION_COLORS[id]);
-      const name = document.createElement("span");
-      name.className = "picker-name";
-      name.textContent = meta.name;
-
-      option.addEventListener("click", () => {
-        if (state.enabledTranslations.includes(id)) removeTranslation(id);
-        else addTranslation(id);
-        renderTranslationPickerMenu();
-        positionTranslationPickerMenu();
-      });
-      option.append(label, name);
-      section.append(option);
-    }
-    translationPickerMenu.append(section);
-  }
-}
-
-// The + button travels with the chip row, so slide the dropdown along the
-// button's edge as far as needed to keep the whole menu on screen.
-function positionTranslationPickerMenu() {
-  if (translationPickerMenu.hidden) return;
-  translationPickerMenu.style.right = "auto";
-  translationPickerMenu.style.left = "0";
-  const width = translationPickerMenu.getBoundingClientRect().width;
-  const anchor = translationPicker.getBoundingClientRect();
-  const left = Math.max(8, Math.min(anchor.left, window.innerWidth - width - 8));
-  translationPickerMenu.style.left = `${left - anchor.left}px`;
-}
-
-function openTranslationPicker() {
-  if (!translationPickerMenu.hidden) return;
-  renderTranslationPickerMenu();
-  translationPickerMenu.hidden = false;
-  positionTranslationPickerMenu();
-  translationPickerToggle.setAttribute("aria-expanded", "true");
-}
-
-function closeTranslationPicker() {
-  pickerOpenedByTouchPress = false;
-  if (translationPickerMenu.hidden) return;
-  translationPickerMenu.hidden = true;
-  translationPickerToggle.setAttribute("aria-expanded", "false");
-}
-
-translationPickerToggle.addEventListener("click", () => {
-  const openedByThisPress = pickerOpenedByTouchPress;
-  pickerOpenedByTouchPress = false;
-  if (Date.now() < pickerSuppressClickUntil) return;
-  if (translationPickerMenu.hidden) openTranslationPicker();
-  else if (!openedByThisPress) closeTranslationPicker();
-});
-
-// A press outside the open picker only dismisses it: the tap or click is
-// swallowed so nothing underneath (verse selection, buttons) reacts.
-document.addEventListener(
-  "pointerdown",
-  (event) => {
-    if (translationPickerMenu.hidden) return;
-    if (translationPicker.contains(event.target)) return;
-    closeTranslationPicker();
-    shieldOutsidePress(event);
-  },
-  true,
-);
-
-document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && !translationPickerMenu.hidden) closeTranslationPicker();
-});
 
 // Native HTML5 drag-and-drop (dragstart/dragover/drop) does not fire on touch
 // input, so touch reordering is driven by Pointer Events instead: the dragged
@@ -854,21 +738,6 @@ function setupPressDragPick({ opener, menu, optionSelector, onOpen, onPick, onGe
   });
 }
 
-setupPressDragPick({
-  opener: translationPickerToggle,
-  menu: translationPickerMenu,
-  optionSelector: ".translation-picker-option",
-  onOpen: () => {
-    if (!translationPickerMenu.hidden) return;
-    openTranslationPicker();
-    pickerOpenedByTouchPress = true;
-  },
-  onPick: (option) => option.click(),
-  onGestureEnd: () => {
-    pickerSuppressClickUntil = Date.now() + 500;
-  },
-});
-
 function renderDialogTranslationPickerMenu({ menu, picker, getOrder, onToggle }) {
   menu.replaceChildren();
   if (!manifest) return;
@@ -1000,20 +869,18 @@ function setupDialogTranslationControl({ picker, toggle, menu, list, getOrder, s
     else if (!openedByThisPress) close();
   });
 
-  document.addEventListener(
-    "pointerdown",
-    (event) => {
-      if (menu.hidden) return;
-      if (picker.contains(event.target)) return;
-      close();
-      shieldOutsidePress(event);
-    },
-    true,
-  );
+  const onOutsidePointerDown = (event) => {
+    if (menu.hidden) return;
+    if (picker.contains(event.target)) return;
+    close();
+    shieldOutsidePress(event);
+  };
+  document.addEventListener("pointerdown", onOutsidePointerDown, true);
 
-  document.addEventListener("keydown", (event) => {
+  const onKeydown = (event) => {
     if (event.key === "Escape" && !menu.hidden) close();
-  });
+  };
+  document.addEventListener("keydown", onKeydown);
 
   setupPressDragPick({
     opener: toggle,
@@ -1030,7 +897,16 @@ function setupDialogTranslationControl({ picker, toggle, menu, list, getOrder, s
     },
   });
 
-  return { render, open, close };
+  // Callers wired to a panel (which can be destroyed mid-session, unlike the
+  // two dialogs this was originally built for) must be able to drop these
+  // document-level listeners so a removed panel's picker/menu aren't kept
+  // alive forever by them.
+  const destroy = () => {
+    document.removeEventListener("pointerdown", onOutsidePointerDown, true);
+    document.removeEventListener("keydown", onKeydown);
+  };
+
+  return { render, open, close, destroy };
 }
 
 const HANGUL_INITIALS = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ";
@@ -1117,12 +993,11 @@ document.addEventListener(
 );
 
 // The portrait two-row header keeps the "Holy Bible" label only while it
-// fits. The layout toggle sits in the flexible column of the top row, so
-// when space runs out it is the first thing pushed into the brand: that
+// fits. The panel-count control sits in the flexible column of the top row,
+// so when space runs out it is the first thing pushed into the brand: that
 // overlap is the signal to drop the label (and re-measure on every resize
 // so it comes back as soon as it fits again).
 const brandLabel = siteBrand.querySelector("span:last-child");
-const verseLayoutControl = verseLayoutStackedButton.closest(".verse-layout-control");
 const panelCountControl = panelCountOneButton.closest(".panel-count-control");
 
 function updateBrandLabelVisibility() {
@@ -1131,10 +1006,7 @@ function updateBrandLabelVisibility() {
   if (phonePortraitLayout.matches) return;
   if (!mobileLayout.matches || touchPanelToggleLayout.matches) return;
   const brandRect = siteBrand.getBoundingClientRect();
-  const controlLeft = Math.min(
-    verseLayoutControl.getBoundingClientRect().left,
-    panelCountControl.getBoundingClientRect().left,
-  );
+  const controlLeft = panelCountControl.getBoundingClientRect().left;
   if (controlLeft < brandRect.right + 2) {
     document.body.classList.add("brand-label-hidden");
   }
@@ -1935,6 +1807,12 @@ function createPanelElement(panelState, shouldScroll = false) {
   const chapterInput = fragment.querySelector(".chapter-input");
   const verseInput = fragment.querySelector(".verse-input");
   const content = fragment.querySelector(".panel-content");
+  const translationPickerEl = fragment.querySelector(".panel-translation-picker");
+  const translationPickerToggleEl = fragment.querySelector(".panel-translation-picker-toggle");
+  const translationPickerMenuEl = fragment.querySelector(".panel-translation-picker-menu");
+  const translationListEl = fragment.querySelector(".panel-translation-list");
+  const verseLayoutStackedEl = fragment.querySelector(".panel-verse-layout-stacked");
+  const verseLayoutColumnsEl = fragment.querySelector(".panel-verse-layout-columns");
   const copy = fragment.querySelector(".copy-selection");
   const selectionModeControl = fragment.querySelector(".selection-mode-control");
   const selectionModeRange = fragment.querySelector(".selection-mode-range");
@@ -2045,6 +1923,22 @@ function createPanelElement(panelState, shouldScroll = false) {
       goToPassage(panelState, { ...draft, verse }, { record: true });
     },
   });
+  const translationControl = setupDialogTranslationControl({
+    picker: translationPickerEl,
+    toggle: translationPickerToggleEl,
+    menu: translationPickerMenuEl,
+    list: translationListEl,
+    getOrder: () => panelState.enabledTranslations,
+    setOrder: (order) => {
+      panelState.enabledTranslations = order;
+    },
+    onChange: () => {
+      saveState();
+      renderPanelBody(panelState);
+    },
+  });
+  verseLayoutStackedEl.addEventListener("click", () => setPanelVerseLayout(panelState, "stacked"));
+  verseLayoutColumnsEl.addEventListener("click", () => setPanelVerseLayout(panelState, "columns"));
   copy.addEventListener("click", () => openCopyDialog(panelState));
   selectionModeRange.addEventListener("click", () => setPanelSelectionMode(panelState, "range"));
   selectionModeIndividual.addEventListener("click", () => setPanelSelectionMode(panelState, "individual"));
@@ -2085,8 +1979,13 @@ function createPanelElement(panelState, shouldScroll = false) {
     moveRight,
     previous,
     next,
+    translationControl,
+    verseLayoutStacked: verseLayoutStackedEl,
+    verseLayoutColumns: verseLayoutColumnsEl,
   });
   panelTrack.append(fragment);
+  translationControl.render();
+  applyPanelVerseLayout(panelState);
   updatePanelNumbers();
   updatePanelMoveButtons();
   updateRemoveButtons();
@@ -2112,7 +2011,13 @@ function addPanel() {
   const previousCount = state.panels.length;
   const viewportStart = panelIndexAtViewportStart();
   const source = state.panels.find((panel) => panel.id === activePanelId) ?? state.panels.at(-1);
-  const panelState = { book: source?.book ?? 0, chapter: source?.chapter ?? 1, width: source?.width ?? null };
+  const panelState = {
+    book: source?.book ?? 0,
+    chapter: source?.chapter ?? 1,
+    width: source?.width ?? null,
+    enabledTranslations: source?.enabledTranslations ? [...source.enabledTranslations] : [...DEFAULT_ENABLED_TRANSLATIONS],
+    verseLayout: source?.verseLayout ?? "stacked",
+  };
   state.panels.push(panelState);
   saveState();
   const twoPanelTouchMode = isTwoPanelTouchMode();
@@ -2137,7 +2042,9 @@ function removePanel(id) {
   panelMutationInProgress = true;
   const isLast = index === state.panels.length - 1;
   const wasViewingRemoved = panelIndexAtViewportStart() === index;
-  const removedPanel = panelElements.get(id)?.panel;
+  const removedElements = panelElements.get(id);
+  const removedPanel = removedElements?.panel;
+  removedElements?.translationControl.destroy();
 
   state.panels.splice(index, 1);
   panelElements.delete(id);
@@ -2550,8 +2457,8 @@ function restoreVerseAnchor(content, anchor) {
 function renderPanelBody(panelState) {
   const elements = panelElements.get(panelState.id);
   if (!elements || !panelState.data) return;
-  const enabled = enabledTranslationIds();
-  const columnLayout = effectiveVerseLayout() === "columns";
+  const enabled = enabledTranslationIds(panelState);
+  const columnLayout = effectiveVerseLayout(panelState) === "columns";
   const fragment = document.createDocumentFragment();
 
   if (columnLayout && enabled.length) {
@@ -2691,8 +2598,8 @@ function openCopyDialog(panelState) {
   const book = manifest.books[panelState.book];
   const reference = formatVerseReference(panelState.chapter, selectedVerses);
   copyReference.textContent = `${book.en} ${book.ko} ${reference}`;
-  // Offer only the translations currently shown, in their reading order.
-  copyTranslationOrder = [...enabledTranslationIds()];
+  // Offer only the translations currently shown in this panel, in their reading order.
+  copyTranslationOrder = [...enabledTranslationIds(panelState)];
   copyTranslationControl?.render();
   copyDialog.showModal();
 }
@@ -2773,7 +2680,10 @@ async function copySelectedVerses() {
 }
 
 function openSearch() {
-  searchTranslationOrder = [...enabledTranslationIds()];
+  // Search isn't tied to a single panel, so default it to whatever the
+  // currently active panel is showing.
+  const activePanel = state.panels.find((panel) => panel.id === activePanelId);
+  searchTranslationOrder = [...enabledTranslationIds(activePanel)];
   searchTranslationControl?.render();
   searchDialog.showModal();
   requestAnimationFrame(() => searchInput.focus());
@@ -3000,7 +2910,6 @@ async function init() {
     sanitizeState();
     applyTouchPanelCount();
     applyFontSize();
-    renderTranslationControls();
     copyTranslationControl = setupDialogTranslationControl({
       picker: copyTranslationPicker,
       toggle: copyTranslationPickerToggle,
@@ -3014,7 +2923,7 @@ async function init() {
         copyStatus.textContent = "";
       },
     });
-    searchTranslationOrder = [...enabledTranslationIds()];
+    searchTranslationOrder = [...DEFAULT_ENABLED_TRANSLATIONS];
     searchTranslationControl = setupDialogTranslationControl({
       picker: searchTranslationPicker,
       toggle: searchTranslationPickerToggle,
@@ -3052,8 +2961,6 @@ panelCountTwoButton.addEventListener("click", () => {
   if (desktopLikePanels()) setDesktopPanelMode(2);
   else setTouchPanelCount(2);
 });
-verseLayoutStackedButton.addEventListener("click", () => setVerseLayout("stacked"));
-verseLayoutColumnsButton.addEventListener("click", () => setVerseLayout("columns"));
 fontSizeDownButton.addEventListener("click", () => changeFontSize(-1));
 fontSizeUpButton.addEventListener("click", () => changeFontSize(1));
 openSearchButton.addEventListener("click", openSearch);
