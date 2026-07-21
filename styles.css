@@ -4045,6 +4045,22 @@ body * {
   order: 2;
 }
 
+/* The panel's own chip row still scrolls horizontally (wheel or drag) once
+   enough versions are added, but doesn't need a visible scrollbar for it. */
+.panel-translation-controls .translation-list {
+  scrollbar-width: none;
+}
+
+.panel-translation-controls .translation-list::-webkit-scrollbar {
+  display: none;
+}
+
+/* No visible scrollbar here means no need to reserve room for one below
+   the chips (unlike the search/copy dialogs, which still show theirs). */
+.panel-translation-controls .translation-list.translation-list--overflowing {
+  padding-bottom: 0;
+}
+
 .verse-group {
   padding-top: 3px;
   padding-bottom: 4px;
