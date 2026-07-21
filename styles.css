@@ -1486,8 +1486,15 @@ mark {
   width: 100%;
   height: 100%;
   align-items: center;
-  justify-content: space-between;
   gap: var(--toolbar-icon-gap);
+}
+
+/* Only the brand sits on the left; everything else (panel count, font
+   size, actions) clusters together on the right, now that the per-panel
+   translation controls no longer occupy the middle flexible space that
+   used to separate them. */
+.compact-toolbar .panel-count-control {
+  margin-left: auto;
 }
 
 .compact-toolbar .translation-controls {
