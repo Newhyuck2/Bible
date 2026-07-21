@@ -428,6 +428,11 @@ function resetSite() {
   searchRequestId += 1;
 }
 
+function resetStoredStateForReload() {
+  const navigation = performance.getEntriesByType?.("navigation")?.[0];
+  if (navigation?.type === "reload") localStorage.removeItem(STORAGE_KEY);
+}
+
 function translationMeta(id) {
   return manifest.translations.find((item) => item.id === id);
 }
@@ -1614,6 +1619,15 @@ function setPanelChromeHidden(panelOrState, hidden) {
   panel.classList.toggle("touch-chrome-hidden", Boolean(hidden && canHide));
 }
 
+function revealPanelChrome(panel, preserveContent = false) {
+  if (!panel?.classList.contains("touch-chrome-hidden")) return;
+  const content = panel.querySelector(".panel-content");
+  const header = panel.querySelector(".panel-header");
+  const offset = preserveContent ? Math.ceil(header?.scrollHeight || 0) : 0;
+  setPanelChromeHidden(panel, false);
+  if (offset && content) content.scrollTop += offset;
+}
+
 // Horizontal touch drags on a panel pan the track by hand, following the
 // finger position directly with momentum on release.
 function setupPanelSwipe(panel) {
@@ -1628,6 +1642,19 @@ function setupPanelSwipe(panel) {
   const shouldIgnoreSwipeStart = (target) => (
     target.closest("button, input, textarea, select, .combo-menu, .panel-resize-handle")
   );
+  const revealHiddenChromeFromPress = (event) => {
+    if (!mobileLayout.matches || !panel.classList.contains("touch-chrome-hidden")) return false;
+    if (shouldIgnoreSwipeStart(event.target)) return false;
+    cancelPanelGlide();
+    revealPanelChrome(panel, true);
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    suppressClick = true;
+    window.setTimeout(() => {
+      suppressClick = false;
+    }, 350);
+    return true;
+  };
 
   panel.addEventListener("click", (event) => {
     if (suppressClick) {
@@ -1637,12 +1664,16 @@ function setupPanelSwipe(panel) {
     }
     if (!mobileLayout.matches || !panel.classList.contains("touch-chrome-hidden")) return;
     if (shouldIgnoreSwipeStart(event.target)) return;
-    setPanelChromeHidden(panel, false);
+    revealPanelChrome(panel, true);
     event.preventDefault();
     event.stopImmediatePropagation();
   }, true);
 
   panel.addEventListener("touchstart", (event) => {
+    if (revealHiddenChromeFromPress(event)) {
+      gesture = null;
+      return;
+    }
     cancelPanelGlide();
     if (event.touches.length !== 1) {
       gesture = null;
@@ -1661,7 +1692,7 @@ function setupPanelSwipe(panel) {
       axis: null,
       samples: [{ time: performance.now(), x: touch.clientX }],
     };
-  }, { passive: true });
+  }, { passive: false });
 
   panel.addEventListener("touchmove", (event) => {
     if (!gesture) return;
@@ -2923,6 +2954,7 @@ async function init() {
     const response = await fetch(`./data/manifest.json?v=${ASSET_VERSION}`, { cache: "no-store" });
     if (!response.ok) throw new Error(`Could not load site data (${response.status})`);
     manifest = await response.json();
+    resetStoredStateForReload();
     state = loadState();
     sanitizeState();
     applyTouchPanelCount();

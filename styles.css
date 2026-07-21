@@ -4062,6 +4062,12 @@ html[data-verse-layout="columns"] .translation-label {
 }
 
 @media (max-width: 820px), (max-width: 1366px) and (any-pointer: coarse) {
+  .search-dialog .dialog-translation-controls .translation-list,
+  .copy-dialog .dialog-translation-controls .translation-list {
+    position: relative;
+    top: -1px;
+  }
+
   .bible-panel .panel-header {
     max-height: 92px;
     transition:
