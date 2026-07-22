@@ -3958,18 +3958,19 @@ body * {
 .dialog-translation-controls .translation-list {
   display: flex;
   flex: 1 1 auto;
-  height: 32px;
-  min-height: 32px;
-  max-height: 32px;
+  height: 46px;
+  min-height: 46px;
+  max-height: 46px;
   min-width: 0;
-  align-items: center;
+  align-items: flex-start;
   align-self: flex-start;
-  overflow-x: auto;
+  overflow-x: scroll;
   overflow-y: hidden;
   gap: 5px;
   margin-top: 0;
-  padding-block: 0;
+  padding: 0 0 10px;
   line-height: 0;
+  overscroll-behavior-x: contain;
   scrollbar-width: thin;
 }
 
