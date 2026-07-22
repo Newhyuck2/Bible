@@ -2390,11 +2390,15 @@ function selectVerse(panelState, verse) {
   if (hasVerseSelection(panelState)) revealVerseAboveActions(panelState, verse);
 }
 
-function scrollVerseToTop(panelState, verse, behavior = "smooth") {
+function scrollVerseToTop(panelState, verse) {
   const elements = panelElements.get(panelState.id);
   const group = elements?.content.querySelector(`.verse-group[data-verse="${verse}"]`);
   if (!group) return;
-  group.scrollIntoView({ behavior: reducedMotion.matches ? "auto" : behavior, block: "start" });
+  // Jump straight to the target verse instead of animating there: for a
+  // verse deep into a chapter, a smooth scroll keeps moving well after
+  // goToPassage has already revealed the chrome, and the panel's own
+  // auto-hide-on-scroll then hides it again mid-animation.
+  group.scrollIntoView({ behavior: "auto", block: "start" });
 }
 
 async function loadPanel(panelState, targetVerse = null) {
@@ -2605,10 +2609,16 @@ function navigateChapter(panelState, direction) {
   goToPassage(panelState, { book, chapter, verse: 1 }, { record: true });
 }
 
+// state.fontSize is the actual CSS pixel size (unchanged, so the rendered
+// text stays exactly as tuned); the number shown next to the +/- buttons
+// is offset down by this much so the same default reads as 11 instead of 14.
+const FONT_SIZE_DISPLAY_OFFSET = 3;
+
 function applyFontSize() {
   document.documentElement.style.setProperty("--verse-font-size", `${state.fontSize}px`);
-  fontSizeValue.value = String(state.fontSize);
-  fontSizeValue.textContent = String(state.fontSize);
+  const displayValue = String(state.fontSize - FONT_SIZE_DISPLAY_OFFSET);
+  fontSizeValue.value = displayValue;
+  fontSizeValue.textContent = displayValue;
   fontSizeDownButton.disabled = state.fontSize <= 10;
   fontSizeUpButton.disabled = state.fontSize >= 22;
 }
