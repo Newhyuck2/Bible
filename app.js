@@ -86,7 +86,7 @@ const searchWorker = new Worker(`./search-worker.js?v=${ASSET_VERSION}`);
 
 function freshState() {
   return {
-    fontSize: 16,
+    fontSize: 14,
     touchPanelCount: null,
     desktopPanelMode: null,
     copySelectionMode: "range",
@@ -134,7 +134,7 @@ function sanitizeState() {
   const legacyVerseLayout = state.verseLayout === "columns" ? "columns" : null;
   delete state.verseLayout;
 
-  state.fontSize = Math.max(10, Math.min(Number(state.fontSize) || 16, 22));
+  state.fontSize = Math.max(10, Math.min(Number(state.fontSize) || 14, 22));
   state.copySelectionMode = state.copySelectionMode === "individual" ? "individual" : "range";
   const savedPanelCount = Number(state.touchPanelCount);
   state.touchPanelCount = phonePortraitLayout.matches

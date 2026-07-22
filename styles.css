@@ -11,7 +11,7 @@
   --accent-hover: #1e4036;
   --accent-soft: #e3eee9;
   --warm: #aa6c3d;
-  --verse-font-size: 16px;
+  --verse-font-size: 14px;
   --toolbar-icon-gap: 4px;
   --shadow: 0 18px 45px rgba(55, 45, 30, 0.1);
   --radius: 16px;
@@ -3975,17 +3975,17 @@ body * {
 .dialog-translation-controls .translation-list {
   display: flex;
   flex: 1 1 auto;
-  height: 46px;
-  min-height: 46px;
-  max-height: 46px;
+  height: 32px;
+  min-height: 32px;
+  max-height: 32px;
   min-width: 0;
   align-items: flex-start;
   align-self: flex-start;
-  overflow-x: scroll;
+  overflow-x: auto;
   overflow-y: hidden;
   gap: 5px;
   margin-top: 0;
-  padding: 0 0 10px;
+  padding-block: 0;
   line-height: 0;
   overscroll-behavior-x: contain;
   scrollbar-width: thin;
