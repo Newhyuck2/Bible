@@ -2690,7 +2690,10 @@ function buildCopyText(panelState, translations, order) {
       for (const translation of translations) {
         if (texts[translation]) lines.push(`${verse} ${texts[translation]}`);
       }
-      lines.push("");
+      // With only one version there's nothing to visually separate within
+      // a verse's own block, so skip the blank line and keep verses back
+      // to back; multi-version blocks still get one to set them apart.
+      if (translations.length > 1) lines.push("");
     }
   }
   return lines.join("\n").trim();
