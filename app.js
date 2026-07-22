@@ -258,6 +258,7 @@ function applyPanelVerseLayout(panelState) {
 
 function setPanelVerseLayout(panelState, layout) {
   if (layout !== "stacked" && layout !== "columns") return;
+  keepPanelChromeVisible(panelState);
   panelState.verseLayout = layout;
   saveState();
   applyPanelVerseLayout(panelState);
@@ -816,10 +817,7 @@ function setupDialogTranslationControl({ picker, toggle, menu, list, getOrder, s
   let openedByTouchPress = false;
   const controls = picker.closest(".translation-controls");
   const keepRelatedPanelChromeVisible = () => {
-    const panel = controls?.closest(".bible-panel");
-    if (!panel) return;
-    panel._chromeRevealUntil = performance.now() + 320;
-    setPanelChromeHidden(panel, false);
+    keepPanelChromeVisible(controls?.closest(".bible-panel"));
   };
 
   const render = () => {
@@ -1508,6 +1506,15 @@ function setPanelChromeHidden(panelOrState, hidden) {
   const canHide = !panel.classList.contains("selection-active")
     && (!content || content.scrollTop > 1);
   panel.classList.toggle("touch-chrome-hidden", Boolean(hidden && canHide));
+}
+
+function keepPanelChromeVisible(panelOrState, duration = 320) {
+  const panel = panelOrState instanceof Element
+    ? panelOrState
+    : panelElements.get(panelOrState?.id)?.panel;
+  if (!panel) return;
+  panel._chromeRevealUntil = performance.now() + duration;
+  setPanelChromeHidden(panel, false);
 }
 
 // The panel header/chapter-jump reveal animates over 180ms (see the
