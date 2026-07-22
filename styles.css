@@ -301,6 +301,13 @@ p {
 }
 
 .panel-header {
+  /* .panel-header is an auto-sized row in .bible-panel's grid with no
+     explicit column track, so it defaults to min-width: auto — letting the
+     translation row's chips (which want their full, unshrunk content width)
+     grow the track past the panel's own border instead of scrolling inside
+     it. min-width: 0 lets the row size to the panel and hands overflow to
+     the chip list's own horizontal scrollbar. */
+  min-width: 0;
   padding: 15px 18px 14px;
   border-bottom: 1px solid var(--line);
   border-radius: calc(var(--radius) - 1px) calc(var(--radius) - 1px) 0 0;
@@ -1338,6 +1345,11 @@ mark {
 }
 
 .copy-dialog fieldset {
+  /* Browsers give <fieldset> an intrinsic min-width: min-content, which
+     refuses to shrink below the versions row's full unwrapped width and
+     pushes it past the dialog's edge instead of letting it scroll inside.
+     min-width: 0 opts back into normal shrink-to-fit sizing. */
+  min-width: 0;
   margin: 0;
   padding: 12px;
   border: 1px solid var(--line);
@@ -3952,7 +3964,12 @@ body * {
   display: flex;
   height: 32px;
   align-items: center;
-  align-self: center;
+  /* Match the chip list's own flex-start (see .translation-list and
+     .translation-chip below): the row reserves height for its horizontal
+     scrollbar and top-aligns the chips within it, so the add-version
+     toggle needs the same top alignment instead of centering in the
+     taller row and sitting visibly lower than the chips beside it. */
+  align-self: flex-start;
 }
 
 .dialog-translation-controls .translation-list {
