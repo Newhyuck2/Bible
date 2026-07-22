@@ -8,7 +8,7 @@
     />
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta name="description" content="A compact multi-panel Bible reader" />
-    <meta name="asset-version" content="20260721-12" />
+    <meta name="asset-version" content="20260721-13" />
     <meta name="theme-color" content="#284f43" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -17,7 +17,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" type="image/png" href="./icons/icon-192.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="./icons/icon-180.png" />
-    <link rel="stylesheet" href="./styles.css?v=20260721-12" />
+    <link rel="stylesheet" href="./styles.css?v=20260721-13" />
   </head>
   <body>
     <header class="app-header">
@@ -221,41 +221,6 @@
     <template id="panel-template">
       <article class="bible-panel">
         <header class="panel-header">
-          <div class="translation-controls dialog-translation-controls panel-translation-controls">
-            <div class="translation-picker panel-translation-picker">
-              <button
-                class="translation-picker-toggle panel-translation-picker-toggle"
-                type="button"
-                aria-haspopup="listbox"
-                aria-expanded="false"
-                aria-label="Add version"
-                title="Add version"
-              >
-                <svg class="picker-plus" viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M12 5v14M5 12h14"></path>
-                </svg>
-              </button>
-              <div
-                class="translation-picker-menu panel-translation-picker-menu"
-                role="listbox"
-                aria-label="Available versions"
-                hidden
-              ></div>
-            </div>
-            <div class="translation-list panel-translation-list" aria-label="Selected versions"></div>
-            <div class="verse-layout-control panel-verse-layout-control" role="group" aria-label="Verse translation layout">
-              <button class="panel-verse-layout-stacked" type="button" aria-label="Stack translations vertically" aria-pressed="false">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M5 6h14M5 12h14M5 18h14" stroke-linecap="round"></path>
-                </svg>
-              </button>
-              <button class="panel-verse-layout-columns" type="button" aria-label="Show translations side by side" aria-pressed="false">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M6 5v14M12 5v14M18 5v14" stroke-linecap="round"></path>
-                </svg>
-              </button>
-            </div>
-          </div>
           <div class="panel-selectors">
             <button class="panel-history panel-history-back" type="button" aria-label="Previous passage in history">
               <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -317,6 +282,41 @@
             </div>
             <button class="icon-button close-button remove-panel" type="button" aria-label="Delete panel"><span aria-hidden="true"></span></button>
           </div>
+          <div class="translation-controls dialog-translation-controls panel-translation-controls">
+            <div class="translation-picker panel-translation-picker">
+              <button
+                class="translation-picker-toggle panel-translation-picker-toggle"
+                type="button"
+                aria-haspopup="listbox"
+                aria-expanded="false"
+                aria-label="Add version"
+                title="Add version"
+              >
+                <svg class="picker-plus" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 5v14M5 12h14"></path>
+                </svg>
+              </button>
+              <div
+                class="translation-picker-menu panel-translation-picker-menu"
+                role="listbox"
+                aria-label="Available versions"
+                hidden
+              ></div>
+            </div>
+            <div class="translation-list panel-translation-list" aria-label="Selected versions"></div>
+            <div class="verse-layout-control panel-verse-layout-control" role="group" aria-label="Verse translation layout">
+              <button class="panel-verse-layout-stacked" type="button" aria-label="Stack translations vertically" aria-pressed="false">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M5 6h14M5 12h14M5 18h14" stroke-linecap="round"></path>
+                </svg>
+              </button>
+              <button class="panel-verse-layout-columns" type="button" aria-label="Show translations side by side" aria-pressed="false">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M6 5v14M12 5v14M18 5v14" stroke-linecap="round"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
         </header>
         <div class="panel-content" tabindex="0"></div>
         <button class="chapter-jump chapter-jump-previous previous-chapter" type="button" aria-label="Previous chapter">
@@ -372,6 +372,6 @@
     </div>
 
     <noscript>JavaScript is required to display the Bible text.</noscript>
-    <script type="module" src="./app.js?v=20260721-10"></script>
+    <script type="module" src="./app.js?v=20260721-13"></script>
   </body>
 </html>

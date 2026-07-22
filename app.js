@@ -1490,9 +1490,9 @@ function setPanelChromeHidden(panelOrState, hidden) {
     ? panelOrState
     : panelElements.get(panelOrState?.id)?.panel;
   if (!panel) return;
+  if (hidden && panel._chromeRevealUntil && performance.now() < panel._chromeRevealUntil) return;
   const content = panel.querySelector(".panel-content");
-  const canHide = mobileLayout.matches
-    && !panel.classList.contains("selection-active")
+  const canHide = !panel.classList.contains("selection-active")
     && (!content || content.scrollTop > 1);
   panel.classList.toggle("touch-chrome-hidden", Boolean(hidden && canHide));
 }
@@ -1510,6 +1510,7 @@ function revealPanelChrome(panel, preserveContent = false) {
   if (!panel?.classList.contains("touch-chrome-hidden")) return;
   const content = panel.querySelector(".panel-content");
   const anchor = preserveContent ? captureContentAnchor(content) : null;
+  panel._chromeRevealUntil = performance.now() + CHROME_REVEAL_TRACK_MS + 80;
   setPanelChromeHidden(panel, false);
   if (!anchor) return;
   const start = performance.now();
@@ -1562,7 +1563,7 @@ function setupPanelSwipe(panel) {
   // gesture and makes it impossible to start a fresh drag from a stopped,
   // chrome-hidden panel.
   const suppressRevealIfCoasting = (event) => {
-    if (!mobileLayout.matches || !panel.classList.contains("touch-chrome-hidden")) return;
+    if (!panel.classList.contains("touch-chrome-hidden")) return;
     if (shouldIgnoreSwipeStart(event.target)) return;
     if (!isContentCoasting(panel.querySelector(".panel-content"))) return;
     suppressClick = true;
@@ -1577,7 +1578,7 @@ function setupPanelSwipe(panel) {
       event.stopImmediatePropagation();
       return;
     }
-    if (!mobileLayout.matches || !panel.classList.contains("touch-chrome-hidden")) return;
+    if (!panel.classList.contains("touch-chrome-hidden")) return;
     if (shouldIgnoreSwipeStart(event.target)) return;
     revealPanelChrome(panel, true);
     event.preventDefault();
@@ -1845,6 +1846,7 @@ function createPanelElement(panelState, shouldScroll = false) {
   content.addEventListener("scroll", () => {
     content._lastScrollAt = performance.now();
     if (content.scrollTop <= 1) setPanelChromeHidden(panel, false);
+    else setPanelChromeHidden(panel, true);
   }, { passive: true });
 
   const bookItems = manifest.books.map((book, index) => ({

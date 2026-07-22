@@ -3939,20 +3939,20 @@ body * {
 }
 
 .dialog-translation-controls {
-  display: grid;
-  grid-template-columns: 32px minmax(0, 1fr);
+  display: flex;
   height: auto;
   min-height: 32px;
   min-width: 0;
-  align-items: start;
+  align-items: center;
   gap: var(--toolbar-icon-gap);
   overflow: visible;
 }
 
 .dialog-translation-controls .translation-picker {
-  display: block;
+  display: flex;
   height: 32px;
-  align-self: start;
+  align-items: center;
+  align-self: center;
 }
 
 .dialog-translation-controls .translation-list {
@@ -3961,8 +3961,8 @@ body * {
   height: auto;
   min-height: 32px;
   min-width: 0;
-  align-items: flex-start;
-  align-self: start;
+  align-items: center;
+  align-self: center;
   overflow-y: visible;
   gap: 5px;
   margin-top: 0;
@@ -3983,7 +3983,7 @@ body * {
   height: 32px;
   min-height: 32px;
   max-height: 32px;
-  align-self: flex-start;
+  align-self: center;
 }
 
 .dialog-translation-controls .translation-chip {
@@ -4033,7 +4033,16 @@ body * {
    can differ panel to panel instead of applying to the whole page. */
 .panel-translation-controls {
   grid-template-columns: 32px minmax(0, 1fr) auto;
-  margin-bottom: 8px;
+  margin-top: 8px;
+  overflow: hidden;
+  max-height: 64px;
+  opacity: 1;
+  filter: brightness(1);
+  transition:
+    max-height 180ms ease,
+    margin 180ms ease,
+    opacity 180ms ease,
+    filter 180ms ease;
 }
 
 .panel-translation-controls .verse-layout-control {
@@ -4061,6 +4070,28 @@ body * {
   padding-bottom: 0;
 }
 
+.bible-panel .chapter-jump {
+  transition:
+    opacity 180ms ease,
+    filter 180ms ease,
+    transform 180ms ease;
+}
+
+.bible-panel.touch-chrome-hidden .panel-translation-controls {
+  max-height: 0;
+  margin-top: 0;
+  opacity: 0;
+  filter: brightness(0.92);
+  pointer-events: none;
+}
+
+.bible-panel.touch-chrome-hidden .chapter-jump {
+  opacity: 0;
+  filter: brightness(0.92);
+  transform: translateY(8px);
+  pointer-events: none;
+}
+
 .verse-group {
   padding-top: 3px;
   padding-bottom: 4px;
@@ -4081,46 +4112,6 @@ body * {
   .copy-dialog .dialog-translation-controls .translation-list {
     position: static;
     top: auto;
-  }
-
-  .bible-panel .panel-header {
-    /* Generous ceiling, not a fixed size: the header now carries two rows
-       (translation controls + book/chapter/verse selectors), and the
-       translation row itself can grow taller when its chip list needs a
-       scrollbar. max-height only needs to exceed the tallest realistic case
-       so the reveal transition never clips it. */
-    max-height: 220px;
-    transition:
-      max-height 180ms ease,
-      padding 180ms ease,
-      opacity 180ms ease,
-      filter 180ms ease,
-      border-color 180ms ease;
-  }
-
-  .bible-panel .chapter-jump {
-    transition:
-      opacity 180ms ease,
-      filter 180ms ease,
-      transform 180ms ease;
-  }
-
-  .bible-panel.touch-chrome-hidden .panel-header {
-    max-height: 0;
-    overflow: hidden;
-    padding-top: 0;
-    padding-bottom: 0;
-    border-bottom: 0;
-    opacity: 0;
-    filter: brightness(0.92);
-    pointer-events: none;
-  }
-
-  .bible-panel.touch-chrome-hidden .chapter-jump {
-    opacity: 0;
-    filter: brightness(0.92);
-    transform: translateY(8px);
-    pointer-events: none;
   }
 
   .bible-panel.touch-chrome-hidden .panel-move {
