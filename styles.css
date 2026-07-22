@@ -4074,6 +4074,12 @@ body * {
   padding-bottom: 0;
 }
 
+.panel-translation-controls.translation-picker-open {
+  position: relative;
+  overflow: visible;
+  z-index: 5;
+}
+
 .bible-panel .chapter-jump {
   transition:
     opacity 180ms ease,
@@ -4088,6 +4094,7 @@ body * {
   margin-top: 0;
   padding-top: 0;
   padding-bottom: 0;
+  overflow: hidden;
   opacity: 0;
   filter: brightness(0.92);
   pointer-events: none;

@@ -814,6 +814,7 @@ function positionTranslationPickerMenuFor(picker, menu) {
 function setupDialogTranslationControl({ picker, toggle, menu, list, getOrder, setOrder, onChange }) {
   let suppressClickUntil = 0;
   let openedByTouchPress = false;
+  const controls = picker.closest(".translation-controls");
 
   const render = () => {
     renderTranslationChipList({
@@ -850,6 +851,7 @@ function setupDialogTranslationControl({ picker, toggle, menu, list, getOrder, s
     if (!menu.hidden) return;
     renderDialogTranslationPickerMenu({ menu, picker, getOrder, onToggle });
     menu.hidden = false;
+    controls?.classList.add("translation-picker-open");
     positionTranslationPickerMenuFor(picker, menu);
     toggle.setAttribute("aria-expanded", "true");
   };
@@ -858,6 +860,7 @@ function setupDialogTranslationControl({ picker, toggle, menu, list, getOrder, s
     openedByTouchPress = false;
     if (menu.hidden) return;
     menu.hidden = true;
+    controls?.classList.remove("translation-picker-open");
     toggle.setAttribute("aria-expanded", "false");
   };
 
@@ -902,6 +905,7 @@ function setupDialogTranslationControl({ picker, toggle, menu, list, getOrder, s
   // document-level listeners so a removed panel's picker/menu aren't kept
   // alive forever by them.
   const destroy = () => {
+    controls?.classList.remove("translation-picker-open");
     document.removeEventListener("pointerdown", onOutsidePointerDown, true);
     document.removeEventListener("keydown", onKeydown);
   };
