@@ -2412,6 +2412,10 @@ async function loadPanel(panelState, targetVerse = null) {
     panelState.data = data;
     panelState.verse = targetVerse || 1;
     renderPanelBody(panelState);
+    // Re-arm here too: the chapter fetch above may have outlasted the
+    // suppression goToPassage armed before awaiting it, and this scroll
+    // is what would otherwise trip the auto-hide on a slow load.
+    keepPanelChromeVisible(panelState, 600);
     if (targetVerse) {
       requestAnimationFrame(() => scrollVerseToTop(panelState, targetVerse));
     } else {
@@ -2425,7 +2429,11 @@ async function loadPanel(panelState, targetVerse = null) {
 }
 
 async function goToPassage(panelState, passage, { record = true } = {}) {
-  setPanelChromeHidden(panelState, false);
+  // The jump to the target verse below (scrollVerseToTop's smooth
+  // scrollIntoView, or loadPanel's scroll for a chapter change) fires its
+  // own "scroll" events, which would otherwise immediately re-hide the
+  // chrome this line just revealed. Hold it visible until that settles.
+  keepPanelChromeVisible(panelState, 600);
   const target = normalizePassage(passage.book, passage.chapter, passage.verse);
   const chapterChanged = panelState.book !== target.book || panelState.chapter !== target.chapter || !panelState.data;
   panelState.book = target.book;
