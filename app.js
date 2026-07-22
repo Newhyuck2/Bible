@@ -10,11 +10,12 @@ const TRANSLATION_COLORS = {
   KRV: "#6b7d3d",
   SAENEW: "#805692",
   WLB: "#a24f62",
+  KLB: "#b0632e",
   CNV: "#5d5fa0",
 };
 const TRANSLATION_GROUPS = [
   { label: "English", ids: ["ESV", "NIV", "KJV", "NASB", "NRSV"] },
-  { label: "Korean", ids: ["GAE", "KRV", "SAENEW", "WLB"] },
+  { label: "Korean", ids: ["GAE", "KRV", "SAENEW", "WLB", "KLB"] },
   { label: "Chinese", ids: ["CNV"] },
 ];
 const TRANSLATION_CANONICAL_ORDER = TRANSLATION_GROUPS.flatMap((group) => group.ids);
