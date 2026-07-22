@@ -1098,10 +1098,24 @@ function isWheelPanRegion(target) {
   return target === panelTrack || target.classList.contains("workspace");
 }
 
+function handleTranslationListWheel(event) {
+  const list = event.target instanceof Element
+    ? event.target.closest(".translation-list")
+    : null;
+  if (!list || list.scrollWidth <= list.clientWidth + 1) return false;
+  const unit = event.deltaMode === 1 ? 16 : 1;
+  const delta = (Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY) * unit;
+  if (!delta) return false;
+  event.preventDefault();
+  list.scrollLeft += delta;
+  return true;
+}
+
 document.addEventListener(
   "wheel",
   (event) => {
     if (mobileLayout.matches || !state?.panels?.length) return;
+    if (handleTranslationListWheel(event)) return;
     if (!isWheelPanRegion(event.target)) return;
     const unit = event.deltaMode === 1 ? 16 : 1;
     const delta = (Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY) * unit;

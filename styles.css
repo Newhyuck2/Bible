@@ -3943,7 +3943,7 @@ body * {
   height: auto;
   min-height: 32px;
   min-width: 0;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--toolbar-icon-gap);
   overflow: visible;
 }
@@ -3958,24 +3958,27 @@ body * {
 .dialog-translation-controls .translation-list {
   display: flex;
   flex: 1 1 auto;
-  height: auto;
+  height: 32px;
   min-height: 32px;
+  max-height: 32px;
   min-width: 0;
   align-items: center;
-  align-self: center;
-  overflow-y: visible;
+  align-self: flex-start;
+  overflow-x: auto;
+  overflow-y: hidden;
   gap: 5px;
   margin-top: 0;
   padding-block: 0;
   line-height: 0;
+  scrollbar-width: thin;
 }
 
-/* A horizontal scrollbar eats into this row's own box from the bottom edge;
-   without slack below the 32px chips, it clips their bottom rather than
-   sitting under them. Reserve that slack only once chips actually overflow
-   (toggled in app.js), so the row stays compact the rest of the time. */
 .dialog-translation-controls .translation-list.translation-list--overflowing {
-  padding-bottom: 18px;
+  height: 46px;
+  min-height: 46px;
+  max-height: 46px;
+  align-items: flex-start;
+  padding-bottom: 10px;
 }
 
 .dialog-translation-controls .translation-picker-toggle,
@@ -3983,7 +3986,7 @@ body * {
   height: 32px;
   min-height: 32px;
   max-height: 32px;
-  align-self: center;
+  align-self: flex-start;
 }
 
 .dialog-translation-controls .translation-chip {
@@ -3997,6 +4000,19 @@ body * {
 
 .dialog-translation-controls .translation-chip .chip-remove {
   align-self: center;
+}
+
+.dialog-translation-controls .translation-list::-webkit-scrollbar {
+  height: 10px;
+}
+
+.dialog-translation-controls .translation-list::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #c9bda9;
+}
+
+.dialog-translation-controls .translation-list::-webkit-scrollbar-track {
+  background: #eee8dc;
 }
 
 .dialog-translation-controls .translation-picker-menu {
@@ -4056,22 +4072,6 @@ body * {
      so without this the unordered (order: 0) toggle would tie with the
      picker and sort ahead of the order: 1 chip list. */
   order: 2;
-}
-
-/* The panel's own chip row still scrolls horizontally (wheel or drag) once
-   enough versions are added, but doesn't need a visible scrollbar for it. */
-.panel-translation-controls .translation-list {
-  scrollbar-width: none;
-}
-
-.panel-translation-controls .translation-list::-webkit-scrollbar {
-  display: none;
-}
-
-/* No visible scrollbar here means no need to reserve room for one below
-   the chips (unlike the search/copy dialogs, which still show theirs). */
-.panel-translation-controls .translation-list.translation-list--overflowing {
-  padding-bottom: 0;
 }
 
 .panel-translation-controls.translation-picker-open {
