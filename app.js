@@ -815,6 +815,12 @@ function setupDialogTranslationControl({ picker, toggle, menu, list, getOrder, s
   let suppressClickUntil = 0;
   let openedByTouchPress = false;
   const controls = picker.closest(".translation-controls");
+  const keepRelatedPanelChromeVisible = () => {
+    const panel = controls?.closest(".bible-panel");
+    if (!panel) return;
+    panel._chromeRevealUntil = performance.now() + 320;
+    setPanelChromeHidden(panel, false);
+  };
 
   const render = () => {
     renderTranslationChipList({
@@ -822,6 +828,7 @@ function setupDialogTranslationControl({ picker, toggle, menu, list, getOrder, s
       order: getOrder(),
       onRemove: (id) => {
         setOrder(getOrder().filter((item) => item !== id));
+        keepRelatedPanelChromeVisible();
         render();
         onChange?.();
       },
@@ -829,6 +836,7 @@ function setupDialogTranslationControl({ picker, toggle, menu, list, getOrder, s
         const order = [...getOrder()];
         if (!moveTranslationInOrder(order, from, to)) return;
         setOrder(order);
+        keepRelatedPanelChromeVisible();
         render();
         onChange?.();
       },
@@ -843,6 +851,7 @@ function setupDialogTranslationControl({ picker, toggle, menu, list, getOrder, s
     } else if (insertTranslationInOrder(order, id)) {
       setOrder(order);
     }
+    keepRelatedPanelChromeVisible();
     render();
     onChange?.();
   };
