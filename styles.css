@@ -4034,13 +4034,17 @@ body * {
 .panel-translation-controls {
   grid-template-columns: 32px minmax(0, 1fr) auto;
   margin-top: 8px;
+  min-height: 32px;
   overflow: hidden;
   max-height: 64px;
   opacity: 1;
   filter: brightness(1);
   transition:
+    height 180ms ease,
     max-height 180ms ease,
+    min-height 180ms ease,
     margin 180ms ease,
+    padding 180ms ease,
     opacity 180ms ease,
     filter 180ms ease;
 }
@@ -4078,8 +4082,12 @@ body * {
 }
 
 .bible-panel.touch-chrome-hidden .panel-translation-controls {
+  height: 0;
+  min-height: 0;
   max-height: 0;
   margin-top: 0;
+  padding-top: 0;
+  padding-bottom: 0;
   opacity: 0;
   filter: brightness(0.92);
   pointer-events: none;
