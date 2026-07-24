@@ -19,7 +19,7 @@ const TRANSLATION_GROUPS = [
 ];
 const TRANSLATION_CANONICAL_ORDER = TRANSLATION_GROUPS.flatMap((group) => group.ids);
 const DEFAULT_ENABLED_TRANSLATIONS = ["NIV", "GAE"];
-const DEFAULT_FULL_SIZE_TRANSLATIONS = ["NIV"];
+const DEFAULT_BOLD_TRANSLATIONS = ["NIV"];
 const ASSET_VERSION = document.querySelector('meta[name="asset-version"]').content;
 const MOBILE_LAYOUT_QUERY = "(max-width: 820px), (max-width: 1366px) and (any-pointer: coarse)";
 const mobileLayout = window.matchMedia(MOBILE_LAYOUT_QUERY);
@@ -93,7 +93,7 @@ function freshState() {
       chapter: 1,
       verse: 1,
       enabledTranslations: [...DEFAULT_ENABLED_TRANSLATIONS],
-      fullSizeTranslations: [...DEFAULT_FULL_SIZE_TRANSLATIONS],
+      boldTranslations: [...DEFAULT_BOLD_TRANSLATIONS],
       verseLayout: "stacked",
       history: [{ book: 0, chapter: 1, verse: 1 }],
       historyIndex: 0,
@@ -168,8 +168,8 @@ function sanitizeState() {
         (Array.isArray(panel.enabledTranslations) ? panel.enabledTranslations : legacyEnabled ?? DEFAULT_ENABLED_TRANSLATIONS)
           .filter((id) => validTranslations.has(id)),
       )];
-      const fullSizeTranslations = [...new Set(
-        (Array.isArray(panel.fullSizeTranslations) ? panel.fullSizeTranslations : DEFAULT_FULL_SIZE_TRANSLATIONS)
+      const boldTranslations = [...new Set(
+        (Array.isArray(panel.boldTranslations) ? panel.boldTranslations : DEFAULT_BOLD_TRANSLATIONS)
           .filter((id) => enabledTranslations.includes(id)),
       )];
       const verseLayout = panel.verseLayout === "columns" || panel.verseLayout === "stacked"
@@ -183,7 +183,7 @@ function sanitizeState() {
         historyIndex,
         width: Number.isFinite(width) ? Math.max(1, Math.min(width, 5000)) : null,
         enabledTranslations,
-        fullSizeTranslations,
+        boldTranslations,
         verseLayout,
       };
     })
@@ -207,7 +207,7 @@ function saveState() {
         historyIndex,
         width,
         enabledTranslations,
-        fullSizeTranslations,
+        boldTranslations,
         verseLayout,
       }) => ({
         book,
@@ -217,7 +217,7 @@ function saveState() {
         historyIndex,
         width,
         enabledTranslations,
-        fullSizeTranslations,
+        boldTranslations,
         verseLayout,
       })),
     }),
@@ -447,6 +447,7 @@ function resetSite() {
   panelElements.clear();
   state = freshState();
   sanitizeState();
+  state.panels[0].historyIsProvisional = true;
   if (desktopLikePanels()) {
     if (touchPanelToggleLayout.matches) state.desktopPanelMode = 2;
     state.panels[0].width = touchPanelToggleLayout.matches
@@ -497,7 +498,7 @@ function moveTranslationInOrder(order, from, to) {
   return true;
 }
 
-function renderTranslationChipList({ list, order, isActive, onToggleActive, onMove }) {
+function renderTranslationChipList({ list, order, isActive, onToggleActive, onRemove, onMove }) {
   list.replaceChildren();
 
   for (const id of order) {
@@ -535,6 +536,20 @@ function renderTranslationChipList({ list, order, isActive, onToggleActive, onMo
       chip.addEventListener("click", () => onToggleActive(id));
     }
 
+    const removeButton = document.createElement("button");
+    removeButton.type = "button";
+    removeButton.className = "chip-remove close-button";
+    removeButton.setAttribute("aria-label", `Remove ${meta.label}`);
+    removeButton.title = `Remove ${meta.label}`;
+    const removeIcon = document.createElement("span");
+    removeIcon.setAttribute("aria-hidden", "true");
+    removeButton.append(removeIcon);
+    removeButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      onRemove(id);
+    });
+    removeButton.addEventListener("pointerdown", (event) => event.stopPropagation());
+
     chip.addEventListener("dragstart", (event) => {
       chip.classList.add("dragging");
       event.dataTransfer.setData("text/plain", id);
@@ -550,7 +565,7 @@ function renderTranslationChipList({ list, order, isActive, onToggleActive, onMo
       if (from >= 0 && to >= 0 && from !== to) onMove(from, to);
     });
 
-    chip.append(handle, name);
+    chip.append(handle, name, removeButton);
     list.append(chip);
   }
 
@@ -832,6 +847,11 @@ function setupDialogTranslationControl({
         render();
         onChange?.();
       }),
+      onRemove: (id) => {
+        setOrder(getOrder().filter((item) => item !== id));
+        render();
+        onChange?.();
+      },
       onMove: (from, to) => {
         const order = [...getOrder()];
         if (!moveTranslationInOrder(order, from, to)) return;
@@ -1677,6 +1697,14 @@ function ensurePanelHistory(panelState) {
 function recordPanelHistory(panelState, passage = currentPassage(panelState)) {
   ensurePanelHistory(panelState);
   if (samePassage(panelState.history[panelState.historyIndex], passage)) return;
+  // The passage a fresh/reset panel starts on isn't a real visited stop —
+  // replace it in place instead of recording a back-target for it, but only
+  // for this first navigation; after that history behaves normally.
+  if (panelState.historyIsProvisional) {
+    panelState.historyIsProvisional = false;
+    panelState.history[panelState.historyIndex] = passage;
+    return;
+  }
   panelState.history = panelState.history.slice(0, panelState.historyIndex + 1);
   panelState.history.push(passage);
   if (panelState.history.length > 100) panelState.history.shift();
@@ -1836,14 +1864,14 @@ function createPanelElement(panelState, shouldScroll = false) {
     getOrder: () => panelState.enabledTranslations,
     setOrder: (order) => {
       panelState.enabledTranslations = order;
-      panelState.fullSizeTranslations = panelState.fullSizeTranslations.filter((id) => order.includes(id));
+      panelState.boldTranslations = panelState.boldTranslations.filter((id) => order.includes(id));
     },
-    getActive: (id) => panelState.fullSizeTranslations.includes(id),
+    getActive: (id) => panelState.boldTranslations.includes(id),
     onToggleActive: (id) => {
-      const active = new Set(panelState.fullSizeTranslations);
+      const active = new Set(panelState.boldTranslations);
       if (active.has(id)) active.delete(id);
       else active.add(id);
-      panelState.fullSizeTranslations = [...active];
+      panelState.boldTranslations = [...active];
     },
     onChange: () => {
       saveState();
@@ -1929,7 +1957,7 @@ function addPanel() {
     chapter: source?.chapter ?? 1,
     width: source?.width ?? null,
     enabledTranslations: source?.enabledTranslations ? [...source.enabledTranslations] : [...DEFAULT_ENABLED_TRANSLATIONS],
-    fullSizeTranslations: source?.fullSizeTranslations ? [...source.fullSizeTranslations] : [...DEFAULT_FULL_SIZE_TRANSLATIONS],
+    boldTranslations: source?.boldTranslations ? [...source.boldTranslations] : [...DEFAULT_BOLD_TRANSLATIONS],
     verseLayout: source?.verseLayout ?? "stacked",
   };
   state.panels.push(panelState);
@@ -2407,11 +2435,9 @@ function renderPanelBody(panelState) {
       if (translationText) rendered += 1;
       const line = document.createElement("div");
       line.className = "translation-line";
+      line.classList.toggle("translation-line--bold", panelState.boldTranslations.includes(translation));
       line.lang = translationLanguage(translation);
       line.style.setProperty("--translation-color", TRANSLATION_COLORS[translation]);
-      if (!panelState.fullSizeTranslations.includes(translation)) {
-        line.style.setProperty("--translation-font-size", "calc(var(--verse-font-size) - 1px)");
-      }
       if (columnLayout) line.style.gridColumn = String(index + 1);
       const label = document.createElement("span");
       label.className = "translation-label";

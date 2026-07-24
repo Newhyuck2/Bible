@@ -3282,6 +3282,13 @@ body * {
   display: none;
 }
 
+/* Hiding the label above leaves .translation-text as the grid's only item;
+   without collapsing to one track it lands in the label's narrow first
+   column instead of the full-width second one, wrapping into a tall sliver. */
+.bible-panel.single-translation .translation-line {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 @media (max-width: 820px), (max-width: 1366px) and (any-pointer: coarse) {
   .bible-panel[data-verse-layout="columns"] .column-translation-header,
   .bible-panel[data-verse-layout="columns"] .verse-group {
@@ -3471,6 +3478,37 @@ body * {
   white-space: nowrap;
 }
 
+.translation-chip .chip-remove {
+  display: flex;
+  width: 18px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #9c9589;
+  font-size: 0;
+  line-height: 1;
+}
+
+.translation-chip .chip-remove span {
+  width: 14px;
+  height: 14px;
+}
+
+.translation-chip .chip-remove span::before,
+.translation-chip .chip-remove span::after {
+  width: 13px;
+  height: 1.7px;
+}
+
+.translation-chip .chip-remove:hover {
+  background: rgba(162, 79, 98, 0.14);
+  color: #a24f62;
+}
+
 /* Touch press-drag selection needs the browser to leave these gestures
    alone; none of these controls sit in a vertically scrolling region. */
 .combo-input {
@@ -3490,6 +3528,12 @@ body * {
 
   .translation-name {
     align-self: stretch;
+  }
+
+  .translation-chip .chip-remove {
+    width: 24px;
+    height: 28px;
+    font-size: 0;
   }
 }
 
@@ -3894,6 +3938,10 @@ body * {
   line-height: 1;
 }
 
+.dialog-translation-controls .translation-chip .chip-remove {
+  align-self: center;
+}
+
 .dialog-translation-controls .translation-list::-webkit-scrollbar {
   height: 10px;
 }
@@ -4000,14 +4048,14 @@ body * {
   }
 }
 
-/* Panel version chip: green marks the version shown at the current text
-   size; white (the default chip look) marks the version shown one point
-   smaller. Toggled by clicking the chip itself. */
+/* Panel version chip: green (toggled by clicking the chip itself) marks the
+   version rendered in bold in the panel; white is the default, regular
+   weight. Border color matches the add-version toggle's active state. */
 .panel-translation-list .translation-chip.chip-active {
-  border-color: var(--accent);
+  border-color: #a7c9b8;
   background: var(--accent-soft);
 }
 
-.translation-text {
-  font-size: var(--translation-font-size, var(--verse-font-size));
+.translation-line.translation-line--bold .translation-text {
+  font-weight: 700;
 }
