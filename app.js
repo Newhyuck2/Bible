@@ -1,5 +1,4 @@
 const STORAGE_KEY = "side-by-side-bible:v1";
-const RELOAD_RESET_KEY = "side-by-side-bible:reset-on-load";
 const TRANSLATION_COLORS = {
   ESV: "#9b5c34",
   NIV: "#476f9b",
@@ -20,6 +19,7 @@ const TRANSLATION_GROUPS = [
 ];
 const TRANSLATION_CANONICAL_ORDER = TRANSLATION_GROUPS.flatMap((group) => group.ids);
 const DEFAULT_ENABLED_TRANSLATIONS = ["NIV", "GAE"];
+const DEFAULT_FULL_SIZE_TRANSLATIONS = ["NIV"];
 const ASSET_VERSION = document.querySelector('meta[name="asset-version"]').content;
 const MOBILE_LAYOUT_QUERY = "(max-width: 820px), (max-width: 1366px) and (any-pointer: coarse)";
 const mobileLayout = window.matchMedia(MOBILE_LAYOUT_QUERY);
@@ -65,10 +65,6 @@ const copyTranslationPickerToggle = document.querySelector("#copy-translation-pi
 const copyTranslationPickerMenu = document.querySelector("#copy-translation-picker-menu");
 const copyStatus = document.querySelector("#copy-status");
 const siteBrand = document.querySelector("#site-brand");
-const downloadAppButton = document.querySelector("#download-app");
-const downloadAppLabel = document.querySelector("#download-app-label");
-const installHint = document.querySelector("#install-hint");
-const installHintClose = document.querySelector("#install-hint-close");
 
 let manifest;
 let state;
@@ -97,6 +93,7 @@ function freshState() {
       chapter: 1,
       verse: 1,
       enabledTranslations: [...DEFAULT_ENABLED_TRANSLATIONS],
+      fullSizeTranslations: [...DEFAULT_FULL_SIZE_TRANSLATIONS],
       verseLayout: "stacked",
       history: [{ book: 0, chapter: 1, verse: 1 }],
       historyIndex: 0,
@@ -171,6 +168,10 @@ function sanitizeState() {
         (Array.isArray(panel.enabledTranslations) ? panel.enabledTranslations : legacyEnabled ?? DEFAULT_ENABLED_TRANSLATIONS)
           .filter((id) => validTranslations.has(id)),
       )];
+      const fullSizeTranslations = [...new Set(
+        (Array.isArray(panel.fullSizeTranslations) ? panel.fullSizeTranslations : DEFAULT_FULL_SIZE_TRANSLATIONS)
+          .filter((id) => enabledTranslations.includes(id)),
+      )];
       const verseLayout = panel.verseLayout === "columns" || panel.verseLayout === "stacked"
         ? panel.verseLayout
         : legacyVerseLayout ?? "stacked";
@@ -182,6 +183,7 @@ function sanitizeState() {
         historyIndex,
         width: Number.isFinite(width) ? Math.max(1, Math.min(width, 5000)) : null,
         enabledTranslations,
+        fullSizeTranslations,
         verseLayout,
       };
     })
@@ -197,7 +199,7 @@ function saveState() {
       touchPanelCount: state.touchPanelCount,
       desktopPanelMode: state.desktopPanelMode,
       copySelectionMode: state.copySelectionMode,
-      panels: state.panels.map(({ book, chapter, verse, history, historyIndex, width, enabledTranslations, verseLayout }) => ({
+      panels: state.panels.map(({
         book,
         chapter,
         verse,
@@ -205,6 +207,17 @@ function saveState() {
         historyIndex,
         width,
         enabledTranslations,
+        fullSizeTranslations,
+        verseLayout,
+      }) => ({
+        book,
+        chapter,
+        verse,
+        history,
+        historyIndex,
+        width,
+        enabledTranslations,
+        fullSizeTranslations,
         verseLayout,
       })),
     }),
@@ -260,7 +273,6 @@ function applyPanelVerseLayout(panelState) {
 
 function setPanelVerseLayout(panelState, layout) {
   if (layout !== "stacked" && layout !== "columns") return;
-  keepPanelChromeVisible(panelState);
   panelState.verseLayout = layout;
   saveState();
   applyPanelVerseLayout(panelState);
@@ -455,16 +467,6 @@ function resetSite() {
   searchRequestId += 1;
 }
 
-function resetStoredStateForReload() {
-  const navigation = performance.getEntriesByType?.("navigation")?.[0];
-  const legacyReload = performance.navigation?.type === 1;
-  const flaggedReload = sessionStorage.getItem(RELOAD_RESET_KEY) === "1";
-  sessionStorage.removeItem(RELOAD_RESET_KEY);
-  if (navigation?.type === "reload" || legacyReload || flaggedReload) {
-    localStorage.removeItem(STORAGE_KEY);
-  }
-}
-
 function translationMeta(id) {
   return manifest.translations.find((item) => item.id === id);
 }
@@ -495,7 +497,7 @@ function moveTranslationInOrder(order, from, to) {
   return true;
 }
 
-function renderTranslationChipList({ list, order, onRemove, onMove }) {
+function renderTranslationChipList({ list, order, isActive, onToggleActive, onMove }) {
   list.replaceChildren();
 
   for (const id of order) {
@@ -503,6 +505,7 @@ function renderTranslationChipList({ list, order, onRemove, onMove }) {
     if (!meta) continue;
     const chip = document.createElement("div");
     chip.className = "translation-chip";
+    chip.classList.toggle("chip-active", Boolean(isActive?.(id)));
     chip.draggable = true;
     chip.dataset.translation = id;
     chip.setAttribute("aria-label", `${meta.label} translation`);
@@ -528,19 +531,9 @@ function renderTranslationChipList({ list, order, onRemove, onMove }) {
     name.textContent = meta.label;
     name.style.setProperty("--translation-color", TRANSLATION_COLORS[id]);
 
-    const removeButton = document.createElement("button");
-    removeButton.type = "button";
-    removeButton.className = "chip-remove close-button";
-    removeButton.setAttribute("aria-label", `Remove ${meta.label}`);
-    removeButton.title = `Remove ${meta.label}`;
-    const removeIcon = document.createElement("span");
-    removeIcon.setAttribute("aria-hidden", "true");
-    removeButton.append(removeIcon);
-    removeButton.addEventListener("click", (event) => {
-      event.stopPropagation();
-      onRemove(id);
-    });
-    removeButton.addEventListener("pointerdown", (event) => event.stopPropagation());
+    if (onToggleActive) {
+      chip.addEventListener("click", () => onToggleActive(id));
+    }
 
     chip.addEventListener("dragstart", (event) => {
       chip.classList.add("dragging");
@@ -557,7 +550,7 @@ function renderTranslationChipList({ list, order, onRemove, onMove }) {
       if (from >= 0 && to >= 0 && from !== to) onMove(from, to);
     });
 
-    chip.append(handle, name, removeButton);
+    chip.append(handle, name);
     list.append(chip);
   }
 
@@ -814,29 +807,35 @@ function positionTranslationPickerMenuFor(picker, menu) {
   menu.style.maxHeight = "";
 }
 
-function setupDialogTranslationControl({ picker, toggle, menu, list, getOrder, setOrder, onChange }) {
+function setupDialogTranslationControl({
+  picker,
+  toggle,
+  menu,
+  list,
+  getOrder,
+  setOrder,
+  getActive,
+  onToggleActive,
+  onChange,
+}) {
   let suppressClickUntil = 0;
   let openedByTouchPress = false;
   const controls = picker.closest(".translation-controls");
-  const keepRelatedPanelChromeVisible = () => {
-    keepPanelChromeVisible(controls?.closest(".bible-panel"));
-  };
 
   const render = () => {
     renderTranslationChipList({
       list,
       order: getOrder(),
-      onRemove: (id) => {
-        setOrder(getOrder().filter((item) => item !== id));
-        keepRelatedPanelChromeVisible();
+      isActive: getActive,
+      onToggleActive: onToggleActive && ((id) => {
+        onToggleActive(id);
         render();
         onChange?.();
-      },
+      }),
       onMove: (from, to) => {
         const order = [...getOrder()];
         if (!moveTranslationInOrder(order, from, to)) return;
         setOrder(order);
-        keepRelatedPanelChromeVisible();
         render();
         onChange?.();
       },
@@ -851,7 +850,6 @@ function setupDialogTranslationControl({ picker, toggle, menu, list, getOrder, s
     } else if (insertTranslationInOrder(order, id)) {
       setOrder(order);
     }
-    keepRelatedPanelChromeVisible();
     render();
     onChange?.();
   };
@@ -951,9 +949,6 @@ syncTrackFreeScroll();
 mobileLayout.addEventListener("change", () => {
   updatePanelCountControls();
   syncTrackFreeScroll();
-  if (!mobileLayout.matches) {
-    for (const { panel } of panelElements.values()) setPanelChromeHidden(panel, false);
-  }
 });
 
 // Swallow the press that closed an open dropdown so it cannot reach — and
@@ -1512,65 +1507,6 @@ function snapTouchPanelsAfterSwipe({ velocityX = 0, startIndex = null, totalDelt
   return true;
 }
 
-function setPanelChromeHidden(panelOrState, hidden) {
-  const panel = panelOrState instanceof Element
-    ? panelOrState
-    : panelElements.get(panelOrState?.id)?.panel;
-  if (!panel) return;
-  if (hidden && panel._chromeRevealUntil && performance.now() < panel._chromeRevealUntil) return;
-  const content = panel.querySelector(".panel-content");
-  const canHide = !panel.classList.contains("selection-active")
-    && (!content || content.scrollTop > 1);
-  panel.classList.toggle("touch-chrome-hidden", Boolean(hidden && canHide));
-}
-
-function keepPanelChromeVisible(panelOrState, duration = 320) {
-  const panel = panelOrState instanceof Element
-    ? panelOrState
-    : panelElements.get(panelOrState?.id)?.panel;
-  if (!panel) return;
-  panel._chromeRevealUntil = performance.now() + duration;
-  setPanelChromeHidden(panel, false);
-}
-
-// The panel header/chapter-jump reveal animates over 180ms (see the
-// touch-chrome-hidden transition in styles.css), which continuously resizes
-// the content row as it plays. Correcting the scroll anchor at only a few
-// fixed checkpoints let the verses drift between corrections and snap back,
-// reading as a vertical wobble. Re-anchoring every animation frame for the
-// full transition keeps the verses visually still while only the chrome
-// grows in above them.
-const CHROME_REVEAL_TRACK_MS = 220;
-
-function revealPanelChrome(panel, preserveContent = false) {
-  if (!panel?.classList.contains("touch-chrome-hidden")) return;
-  const content = panel.querySelector(".panel-content");
-  const anchor = preserveContent ? captureContentAnchor(content) : null;
-  panel._chromeRevealUntil = performance.now() + CHROME_REVEAL_TRACK_MS + 80;
-  setPanelChromeHidden(panel, false);
-  if (!anchor) return;
-  const start = performance.now();
-  const track = (now) => {
-    restoreContentAnchor(content, anchor);
-    if (now - start < CHROME_REVEAL_TRACK_MS) requestAnimationFrame(track);
-  };
-  requestAnimationFrame(track);
-}
-
-function captureContentAnchor(content) {
-  if (!content) return null;
-  const contentRect = content.getBoundingClientRect();
-  const verse = [...content.querySelectorAll(".verse-group")]
-    .find((group) => group.getBoundingClientRect().bottom > contentRect.top + 1);
-  if (!verse) return { element: content, top: contentRect.top };
-  return { element: verse, top: verse.getBoundingClientRect().top };
-}
-
-function restoreContentAnchor(content, anchor) {
-  if (!content || !anchor?.element?.isConnected) return;
-  const drift = anchor.element.getBoundingClientRect().top - anchor.top;
-  if (Math.abs(drift) > 0.5) content.scrollTop += drift;
-}
 
 // Horizontal touch drags on a panel pan the track by hand, following the
 // finger position directly with momentum on release.
@@ -1586,43 +1522,15 @@ function setupPanelSwipe(panel) {
   const shouldIgnoreSwipeStart = (target) => (
     target.closest("button, input, textarea, select, .combo-menu, .panel-resize-handle")
   );
-  // A touch that lands while the content is still coasting from momentum
-  // scrolling is meant to arrest that motion, not to ask for the chrome
-  // back — suppress the reveal-on-tap click that would otherwise follow.
-  const CHROME_REVEAL_SCROLL_SETTLE_MS = 150;
-  const isContentCoasting = (content) => (
-    Boolean(content) && performance.now() - (content._lastScrollAt ?? 0) < CHROME_REVEAL_SCROLL_SETTLE_MS
-  );
-  // Chrome-reveal-on-tap is decided at touchend/click, never at touchstart:
-  // deciding immediately would mean preventDefault-ing every touch that
-  // lands on hidden chrome, which cancels native scrolling for the whole
-  // gesture and makes it impossible to start a fresh drag from a stopped,
-  // chrome-hidden panel.
-  const suppressRevealIfCoasting = (event) => {
-    if (!panel.classList.contains("touch-chrome-hidden")) return;
-    if (shouldIgnoreSwipeStart(event.target)) return;
-    if (!isContentCoasting(panel.querySelector(".panel-content"))) return;
-    suppressClick = true;
-    window.setTimeout(() => {
-      suppressClick = false;
-    }, 350);
-  };
 
   panel.addEventListener("click", (event) => {
     if (suppressClick) {
       event.preventDefault();
       event.stopImmediatePropagation();
-      return;
     }
-    if (!panel.classList.contains("touch-chrome-hidden")) return;
-    if (shouldIgnoreSwipeStart(event.target)) return;
-    revealPanelChrome(panel, true);
-    event.preventDefault();
-    event.stopImmediatePropagation();
   }, true);
 
   panel.addEventListener("touchstart", (event) => {
-    suppressRevealIfCoasting(event);
     cancelPanelGlide();
     if (event.touches.length !== 1) {
       gesture = null;
@@ -1663,7 +1571,6 @@ function setupPanelSwipe(panel) {
 
     if (!gesture.axis && Math.max(distanceX, distanceY) >= 3) {
       gesture.axis = distanceX > distanceY ? "horizontal" : "vertical";
-      setPanelChromeHidden(panel, true);
     }
     if (gesture.axis !== "horizontal") return;
     if (state.panels.length < 2) return;
@@ -1726,12 +1633,12 @@ function chapterItems(bookIndex) {
 }
 
 function verseItems(panelState) {
-  const verses = panelState.data?.v?.map(([verse]) => Number(verse)).filter(Number.isFinite) ?? [1];
-  return verses.map((verse) => ({ value: verse, label: String(verse) }));
-}
-
-function verseItemsFromChapterData(data) {
-  const verses = data?.v?.map(([verse]) => Number(verse)).filter(Number.isFinite) ?? [1];
+  // Before the chapter data for this panel has loaded, fall back to a
+  // single-item list holding the panel's own verse instead of a hardcoded
+  // 1 — otherwise the pre-fetch updatePanelControls call below would clamp
+  // (and persist) an in-progress or restored verse down to 1.
+  const verses = panelState.data?.v?.map(([verse]) => Number(verse)).filter(Number.isFinite)
+    ?? [Math.max(1, Number(panelState.verse) || 1)];
   return verses.map((verse) => ({ value: verse, label: String(verse) }));
 }
 
@@ -1879,11 +1786,6 @@ function createPanelElement(panelState, shouldScroll = false) {
   }
   panel.addEventListener("pointerdown", () => setActivePanel(id));
   panel.addEventListener("focusin", () => setActivePanel(id));
-  content.addEventListener("scroll", () => {
-    content._lastScrollAt = performance.now();
-    if (content.scrollTop <= 1) setPanelChromeHidden(panel, false);
-    else setPanelChromeHidden(panel, true);
-  }, { passive: true });
 
   const bookItems = manifest.books.map((book, index) => ({
     value: index,
@@ -1892,30 +1794,6 @@ function createPanelElement(panelState, shouldScroll = false) {
     en: book.en,
     testament: index < 39 ? "old" : "new",
   }));
-  let chapterCombo;
-  let verseCombo;
-  const openComboSoon = (combo) => {
-    requestAnimationFrame(() => combo.open(true, !mobileLayout.matches));
-  };
-  const ensureDraft = () => {
-    if (!panelState.pendingPassage) panelState.pendingPassage = currentPassage(panelState);
-    return panelState.pendingPassage;
-  };
-  const openVerseOptionsForDraft = async () => {
-    const draft = ensureDraft();
-    try {
-      const data = await getChapter(draft.book, draft.chapter);
-      const items = verseItemsFromChapterData(data);
-      draft.verse = Math.max(1, Math.min(Number(draft.verse) || 1, items.at(-1)?.value ?? 1));
-      verseCombo.setItems(items);
-      verseCombo.setValue(draft.verse);
-      openComboSoon(verseCombo);
-    } catch {
-      verseCombo.setItems([{ value: 1, label: "1" }]);
-      verseCombo.setValue(1);
-      openComboSoon(verseCombo);
-    }
-  };
   const bookCombo = setupCombobox({
     input: bookInput,
     menu: fragment.querySelector(".book-combo .combo-menu"),
@@ -1923,42 +1801,31 @@ function createPanelElement(panelState, shouldScroll = false) {
     selectedValue: panelState.book,
     matches: matchesBook,
     onSelect: (book) => {
-      const draft = ensureDraft();
-      draft.book = book;
-      draft.chapter = 1;
-      draft.verse = 1;
-      chapterCombo.setItems(chapterItems(book));
-      chapterCombo.setValue(1);
-      verseCombo.setItems([{ value: 1, label: "1" }]);
-      verseCombo.setValue(1);
-      openComboSoon(chapterCombo);
+      goToPassage(panelState, { book, chapter: 1, verse: 1 }, { record: false });
     },
   });
-  chapterCombo = setupCombobox({
+  const chapterCombo = setupCombobox({
     input: chapterInput,
     menu: fragment.querySelector(".chapter-combo .combo-menu"),
     items: chapterItems(panelState.book),
     selectedValue: panelState.chapter,
     matches: (item, query) => !query.trim() || item.label.startsWith(query.trim()),
     onSelect: (chapter) => {
-      const draft = ensureDraft();
-      draft.chapter = chapter;
-      draft.verse = 1;
-      verseCombo.setItems([{ value: 1, label: "1" }]);
-      verseCombo.setValue(1);
-      openVerseOptionsForDraft();
+      goToPassage(panelState, { book: panelState.book, chapter, verse: 1 }, { record: true });
     },
   });
-  verseCombo = setupCombobox({
+  const verseCombo = setupCombobox({
     input: verseInput,
     menu: fragment.querySelector(".verse-combo .combo-menu"),
     items: [{ value: panelState.verse, label: String(panelState.verse) }],
     selectedValue: panelState.verse,
     matches: (item, query) => !query.trim() || item.label.startsWith(query.trim()),
     onSelect: (verse) => {
-      const draft = panelState.pendingPassage ?? currentPassage(panelState);
-      panelState.pendingPassage = null;
-      goToPassage(panelState, { ...draft, verse }, { record: true });
+      goToPassage(
+        panelState,
+        { book: panelState.book, chapter: panelState.chapter, verse },
+        { record: true },
+      );
     },
   });
   const translationControl = setupDialogTranslationControl({
@@ -1969,6 +1836,14 @@ function createPanelElement(panelState, shouldScroll = false) {
     getOrder: () => panelState.enabledTranslations,
     setOrder: (order) => {
       panelState.enabledTranslations = order;
+      panelState.fullSizeTranslations = panelState.fullSizeTranslations.filter((id) => order.includes(id));
+    },
+    getActive: (id) => panelState.fullSizeTranslations.includes(id),
+    onToggleActive: (id) => {
+      const active = new Set(panelState.fullSizeTranslations);
+      if (active.has(id)) active.delete(id);
+      else active.add(id);
+      panelState.fullSizeTranslations = [...active];
     },
     onChange: () => {
       saveState();
@@ -2029,7 +1904,7 @@ function createPanelElement(panelState, shouldScroll = false) {
   updateRemoveButtons();
   updatePanelCountControls();
   setActivePanel(id);
-  loadPanel(panelState);
+  loadPanel(panelState, panelState.verse);
 
   if (shouldScroll) {
     requestAnimationFrame(() => panel.scrollIntoView({ behavior: "smooth", inline: "end", block: "nearest" }));
@@ -2054,6 +1929,7 @@ function addPanel() {
     chapter: source?.chapter ?? 1,
     width: source?.width ?? null,
     enabledTranslations: source?.enabledTranslations ? [...source.enabledTranslations] : [...DEFAULT_ENABLED_TRANSLATIONS],
+    fullSizeTranslations: source?.fullSizeTranslations ? [...source.fullSizeTranslations] : [...DEFAULT_FULL_SIZE_TRANSLATIONS],
     verseLayout: source?.verseLayout ?? "stacked",
   };
   state.panels.push(panelState);
@@ -2299,7 +2175,6 @@ function updatePanelSelection(panelState) {
     group.classList.toggle("selected", selected.has(verse));
   });
   elements.panel.classList.toggle("selection-active", hasSelection);
-  if (hasSelection) setPanelChromeHidden(elements.panel, false);
   elements.copy.hidden = !hasSelection;
   elements.selectionModeControl.hidden = !hasSelection;
   elements.cancelSelection.hidden = !hasSelection;
@@ -2396,10 +2271,6 @@ function scrollVerseToTop(panelState, verse) {
   const elements = panelElements.get(panelState.id);
   const group = elements?.content.querySelector(`.verse-group[data-verse="${verse}"]`);
   if (!group) return;
-  // Jump straight to the target verse instead of animating there: for a
-  // verse deep into a chapter, a smooth scroll keeps moving well after
-  // goToPassage has already revealed the chrome, and the panel's own
-  // auto-hide-on-scroll then hides it again mid-animation.
   group.scrollIntoView({ behavior: "auto", block: "start" });
 }
 
@@ -2418,10 +2289,6 @@ async function loadPanel(panelState, targetVerse = null) {
     panelState.data = data;
     panelState.verse = targetVerse || 1;
     renderPanelBody(panelState);
-    // Re-arm here too: the chapter fetch above may have outlasted the
-    // suppression goToPassage armed before awaiting it, and this scroll
-    // is what would otherwise trip the auto-hide on a slow load.
-    keepPanelChromeVisible(panelState, 600);
     if (targetVerse) {
       requestAnimationFrame(() => scrollVerseToTop(panelState, targetVerse));
     } else {
@@ -2435,11 +2302,6 @@ async function loadPanel(panelState, targetVerse = null) {
 }
 
 async function goToPassage(panelState, passage, { record = true } = {}) {
-  // The jump to the target verse below (scrollVerseToTop's smooth
-  // scrollIntoView, or loadPanel's scroll for a chapter change) fires its
-  // own "scroll" events, which would otherwise immediately re-hide the
-  // chrome this line just revealed. Hold it visible until that settles.
-  keepPanelChromeVisible(panelState, 600);
   const target = normalizePassage(passage.book, passage.chapter, passage.verse);
   const chapterChanged = panelState.book !== target.book || panelState.chapter !== target.chapter || !panelState.data;
   panelState.book = target.book;
@@ -2509,6 +2371,7 @@ function renderPanelBody(panelState) {
   if (!elements || !panelState.data) return;
   const enabled = enabledTranslationIds(panelState);
   const columnLayout = effectiveVerseLayout(panelState) === "columns";
+  elements.panel.classList.toggle("single-translation", enabled.length <= 1);
   const fragment = document.createDocumentFragment();
 
   if (columnLayout && enabled.length) {
@@ -2546,6 +2409,9 @@ function renderPanelBody(panelState) {
       line.className = "translation-line";
       line.lang = translationLanguage(translation);
       line.style.setProperty("--translation-color", TRANSLATION_COLORS[translation]);
+      if (!panelState.fullSizeTranslations.includes(translation)) {
+        line.style.setProperty("--translation-font-size", "calc(var(--verse-font-size) - 1px)");
+      }
       if (columnLayout) line.style.gridColumn = String(index + 1);
       const label = document.createElement("span");
       label.className = "translation-label";
@@ -2964,7 +2830,6 @@ async function init() {
     const response = await fetch(`./data/manifest.json?v=${ASSET_VERSION}`, { cache: "no-store" });
     if (!response.ok) throw new Error(`Could not load site data (${response.status})`);
     manifest = await response.json();
-    resetStoredStateForReload();
     state = loadState();
     sanitizeState();
     applyTouchPanelCount();
@@ -3044,153 +2909,4 @@ phonePortraitLayout.addEventListener("change", schedulePanelLayoutAlignment);
 touchPanelToggleLayout.addEventListener("change", schedulePanelLayoutAlignment);
 touchPanelToggleLayout.addEventListener("change", syncTrackFreeScroll);
 
-// ---- Offline install ----
-// The service worker mirrors every successful same-origin response into the
-// offline cache; the header install button additionally triggers the
-// browser's "install app" prompt (Chrome/Edge on desktop and Android) and
-// bulk-downloads the whole Bible (all chapters + search indexes) so the app
-// keeps working with no network at all. iOS has no install prompt API, so a
-// hint explains Share → Add to Home Screen while the download proceeds.
-const OFFLINE_CACHE = "bible-offline-v1";
-const OFFLINE_READY_KEY = "side-by-side-bible:offline-build";
-let installPromptEvent = null;
-let offlineDownloadInProgress = false;
-
-const IOS_DEVICE = /iPhone|iPad|iPod/.test(navigator.userAgent)
-  || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-
-function runningStandalone() {
-  return window.matchMedia("(display-mode: standalone)").matches
-    || window.navigator.standalone === true;
-}
-
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js").catch(() => {});
-  });
-}
-
-window.addEventListener("beforeinstallprompt", (event) => {
-  event.preventDefault();
-  installPromptEvent = event;
-});
-
-function offlineReady() {
-  return localStorage.getItem(OFFLINE_READY_KEY) === ASSET_VERSION;
-}
-
-function updateDownloadButton() {
-  if (offlineDownloadInProgress) return;
-  const ready = offlineReady();
-  downloadAppButton.disabled = ready;
-  downloadAppButton.title = ready
-    ? "Everything is already downloaded for offline use"
-    : "Install as an app and download everything for offline use";
-  downloadAppLabel.textContent = "Install";
-}
-
-function offlineUrls() {
-  const urls = [
-    "./",
-    "./index.html",
-    `./styles.css?v=${ASSET_VERSION}`,
-    `./app.js?v=${ASSET_VERSION}`,
-    `./search-worker.js?v=${ASSET_VERSION}`,
-    "./manifest.webmanifest",
-    "./icons/icon-180.png",
-    "./icons/icon-192.png",
-    "./icons/icon-512.png",
-    `./data/manifest.json?v=${ASSET_VERSION}`,
-  ];
-  for (const translation of manifest.translations) {
-    urls.push(`./data/search/${translation.id}.json?v=${ASSET_VERSION}`);
-  }
-  manifest.books.forEach((book, bookIndex) => {
-    for (let chapter = 1; chapter <= book.chapters; chapter += 1) {
-      urls.push(chapterPath(bookIndex, chapter));
-    }
-  });
-  return urls;
-}
-
-async function cacheOfflineContent() {
-  const cache = await caches.open(OFFLINE_CACHE);
-  const urls = offlineUrls();
-  let done = 0;
-  let failed = 0;
-  const queue = [...urls];
-  const workers = Array.from({ length: 6 }, async () => {
-    while (queue.length) {
-      const url = queue.shift();
-      try {
-        // Data URLs are versioned by ?v=, so an existing exact match is
-        // current and a re-download (or a retry pass) can skip it. The
-        // small unversioned shell files are always refreshed.
-        if (!url.includes("/data/") || !(await cache.match(url))) {
-          const response = await fetch(url, { cache: "no-store" });
-          if (!response.ok) throw new Error(String(response.status));
-          await cache.delete(url, { ignoreSearch: true });
-          await cache.put(url, response);
-        }
-      } catch {
-        failed += 1;
-      }
-      done += 1;
-      if (done % 10 === 0 || done === urls.length) {
-        downloadAppLabel.textContent = `${Math.round((done / urls.length) * 100)}%`;
-      }
-    }
-  });
-  await Promise.all(workers);
-  return failed;
-}
-
-async function downloadOfflineApp() {
-  if (offlineDownloadInProgress || !manifest) return;
-  if (installPromptEvent) {
-    const prompt = installPromptEvent;
-    installPromptEvent = null;
-    prompt.prompt();
-    await prompt.userChoice.catch(() => {});
-  } else if (IOS_DEVICE && !runningStandalone()) {
-    installHint.hidden = false;
-  }
-  if (!("caches" in window)) {
-    downloadAppLabel.textContent = "Unsupported";
-    return;
-  }
-  offlineDownloadInProgress = true;
-  downloadAppButton.disabled = true;
-  downloadAppButton.classList.add("downloading");
-  try {
-    const failed = await cacheOfflineContent();
-    if (failed) {
-      downloadAppLabel.textContent = "Retry";
-    } else {
-      localStorage.setItem(OFFLINE_READY_KEY, ASSET_VERSION);
-    }
-  } catch {
-    downloadAppLabel.textContent = "Retry";
-  } finally {
-    offlineDownloadInProgress = false;
-    downloadAppButton.classList.remove("downloading");
-    if (offlineReady()) {
-      // Same icon as before the download; the button is simply disabled.
-      updateDownloadButton();
-    } else {
-      downloadAppButton.disabled = false;
-    }
-  }
-}
-
-downloadAppButton.addEventListener("click", downloadOfflineApp);
-installHintClose.addEventListener("click", () => {
-  installHint.hidden = true;
-});
-updateDownloadButton();
-
 init();
-
-window.addEventListener("pagehide", () => {
-  sessionStorage.setItem(RELOAD_RESET_KEY, "1");
-});
