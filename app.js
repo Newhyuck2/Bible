@@ -20,15 +20,22 @@ const TRANSLATION_GROUPS = [
 const TRANSLATION_CANONICAL_ORDER = TRANSLATION_GROUPS.flatMap((group) => group.ids);
 const DEFAULT_ENABLED_TRANSLATIONS = ["NIV", "GAE"];
 const DEFAULT_HIGHLIGHTED_TRANSLATIONS = ["NIV"];
-const PALE_TRANSLATION_COLORS = Object.fromEntries(
-  Object.entries(TRANSLATION_COLORS).map(([id, hex]) => {
-    const channel = (start) => {
-      const value = Number.parseInt(hex.slice(start, start + 2), 16);
-      return Math.round(value + (255 - value) * 0.85);
-    };
-    return [id, `rgb(${channel(1)}, ${channel(3)}, ${channel(5)})`];
-  }),
-);
+
+function blendTranslationColors(whiteRatio) {
+  return Object.fromEntries(
+    Object.entries(TRANSLATION_COLORS).map(([id, hex]) => {
+      const channel = (start) => {
+        const value = Number.parseInt(hex.slice(start, start + 2), 16);
+        return Math.round(value + (255 - value) * whiteRatio);
+      };
+      return [id, `rgb(${channel(1)}, ${channel(3)}, ${channel(5)})`];
+    }),
+  );
+}
+// Chip background: very pale. Chip border, once active: midway between that
+// pale background and the translation's own full-strength text color.
+const PALE_TRANSLATION_COLORS = blendTranslationColors(0.85);
+const MEDIUM_TRANSLATION_COLORS = blendTranslationColors(0.45);
 const ASSET_VERSION = document.querySelector('meta[name="asset-version"]').content;
 const MOBILE_LAYOUT_QUERY = "(max-width: 820px), (max-width: 1366px) and (any-pointer: coarse)";
 const mobileLayout = window.matchMedia(MOBILE_LAYOUT_QUERY);
@@ -517,6 +524,7 @@ function renderTranslationChipList({ list, order, isActive, onToggleActive, onRe
     chip.className = "translation-chip";
     chip.classList.toggle("chip-active", Boolean(isActive?.(id)));
     chip.style.setProperty("--translation-color-pale", PALE_TRANSLATION_COLORS[id]);
+    chip.style.setProperty("--translation-color-medium", MEDIUM_TRANSLATION_COLORS[id]);
     chip.draggable = true;
     chip.dataset.translation = id;
     chip.setAttribute("aria-label", `${meta.label} translation`);
@@ -2419,11 +2427,9 @@ function renderPanelBody(panelState) {
     for (const translation of enabled) {
       const heading = document.createElement("span");
       heading.className = "column-translation-heading";
-      heading.classList.toggle("column-translation-heading--highlight", panelState.highlightedTranslations.includes(translation));
       heading.lang = translationLanguage(translation);
       heading.textContent = translationMeta(translation).label;
       heading.style.setProperty("--translation-color", TRANSLATION_COLORS[translation]);
-      heading.style.setProperty("--translation-color-pale", PALE_TRANSLATION_COLORS[translation]);
       columnHeader.append(heading);
     }
     fragment.append(columnHeader);
@@ -2450,7 +2456,6 @@ function renderPanelBody(panelState) {
       line.classList.toggle("translation-line--highlight", panelState.highlightedTranslations.includes(translation));
       line.lang = translationLanguage(translation);
       line.style.setProperty("--translation-color", TRANSLATION_COLORS[translation]);
-      line.style.setProperty("--translation-color-pale", PALE_TRANSLATION_COLORS[translation]);
       if (columnLayout) line.style.gridColumn = String(index + 1);
       const label = document.createElement("span");
       label.className = "translation-label";

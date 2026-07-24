@@ -4049,31 +4049,17 @@ body * {
 }
 
 /* Panel version chip: toggled by clicking the chip itself, tinted with a
-   pale version of that version's own text color instead of a fixed green;
-   the panel highlights that version's reading area with the same pale tint. */
+   pale version of that version's own text color; its border is a medium
+   shade of the same color once active — darker than the pale background,
+   lighter than the version's full-strength text color. */
 .panel-translation-list .translation-chip.chip-active {
-  border-color: transparent;
+  border-color: var(--translation-color-medium);
   background: var(--translation-color-pale);
 }
 
-/* Stacked layout: tint only the verse text, not the name label beside it. */
-.bible-panel:not([data-verse-layout="columns"]) .translation-line--highlight .translation-text {
-  background: var(--translation-color-pale);
-  border-radius: 6px;
-  margin: -3px -6px;
-  padding: 3px 6px;
-}
-
-/* Side-by-side layout: tint that version's whole column, header included,
-   since its name label already moved into the sticky column header there. */
-.bible-panel[data-verse-layout="columns"] .translation-line--highlight {
-  background: var(--translation-color-pale);
-  border-radius: 6px;
-}
-
-.column-translation-heading.column-translation-heading--highlight {
-  background: var(--translation-color-pale);
-  border-radius: 6px;
-  margin-block: -8px;
-  padding-block: 8px;
+/* Highlighted version: its verse text renders in that version's own color
+   and bold, instead of the default neutral ink, in either verse layout. */
+.translation-line--highlight .translation-text {
+  color: var(--translation-color);
+  font-weight: 700;
 }
