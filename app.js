@@ -19,7 +19,7 @@ const TRANSLATION_GROUPS = [
 ];
 const TRANSLATION_CANONICAL_ORDER = TRANSLATION_GROUPS.flatMap((group) => group.ids);
 const DEFAULT_ENABLED_TRANSLATIONS = ["NIV", "GAE"];
-const DEFAULT_HIGHLIGHTED_TRANSLATIONS = ["NIV"];
+const DEFAULT_HIGHLIGHTED_TRANSLATIONS = [];
 
 function blendTranslationColors(whiteRatio) {
   return Object.fromEntries(
