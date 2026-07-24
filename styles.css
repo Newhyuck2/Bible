@@ -3418,13 +3418,13 @@ body * {
 }
 
 .translation-picker-option.selected {
-  background: #deded9;
-  box-shadow: inset 0 0 0 1px rgba(80, 78, 72, 0.12);
+  background: #eaf5ef;
+  box-shadow: inset 0 0 0 1px rgba(47, 118, 99, 0.12);
 }
 
 .translation-picker-option.selected.highlighted,
 .translation-picker-option.selected:hover {
-  background: #deded9;
+  background: #eaf5ef;
 }
 
 @media (hover: none) and (pointer: coarse) {
@@ -3439,7 +3439,7 @@ body * {
   .translation-picker-option.selected,
   .translation-picker-option.selected:hover,
   .translation-picker-option.selected.highlighted {
-    background: #deded9;
+    background: #eaf5ef;
   }
 }
 
@@ -4048,14 +4048,32 @@ body * {
   }
 }
 
-/* Panel version chip: green (toggled by clicking the chip itself) marks the
-   version rendered in bold in the panel; white is the default, regular
-   weight. Border color matches the add-version toggle's active state. */
+/* Panel version chip: toggled by clicking the chip itself, tinted with a
+   pale version of that version's own text color instead of a fixed green;
+   the panel highlights that version's reading area with the same pale tint. */
 .panel-translation-list .translation-chip.chip-active {
-  border-color: #a7c9b8;
-  background: var(--accent-soft);
+  border-color: transparent;
+  background: var(--translation-color-pale);
 }
 
-.translation-line.translation-line--bold .translation-text {
-  font-weight: 700;
+/* Stacked layout: tint only the verse text, not the name label beside it. */
+.bible-panel:not([data-verse-layout="columns"]) .translation-line--highlight .translation-text {
+  background: var(--translation-color-pale);
+  border-radius: 6px;
+  margin: -3px -6px;
+  padding: 3px 6px;
+}
+
+/* Side-by-side layout: tint that version's whole column, header included,
+   since its name label already moved into the sticky column header there. */
+.bible-panel[data-verse-layout="columns"] .translation-line--highlight {
+  background: var(--translation-color-pale);
+  border-radius: 6px;
+}
+
+.column-translation-heading.column-translation-heading--highlight {
+  background: var(--translation-color-pale);
+  border-radius: 6px;
+  margin-block: -8px;
+  padding-block: 8px;
 }
